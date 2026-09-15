@@ -37,7 +37,8 @@
         <b data-seat-name="away">Noughts</b>
         <small data-seat-note="away">second</small>
       </span>
-      <span class="seat__score" data-seat-score="away">0</span>
+      <span class="seat__score" data-seat-score="away" title="Small boards won">0</span>
+      <span class="seat__clock" data-seat-clock="away" hidden>5:00</span>
     </div>
 
     <div class="board-frame">
@@ -53,7 +54,8 @@
         <b data-seat-name="home">Crosses</b>
         <small data-seat-note="home">first</small>
       </span>
-      <span class="seat__score" data-seat-score="home">0</span>
+      <span class="seat__score" data-seat-score="home" title="Small boards won">0</span>
+      <span class="seat__clock" data-seat-clock="home" hidden>5:00</span>
     </div>
 
     <p class="status" data-status role="status" aria-live="polite">
@@ -72,6 +74,26 @@
         <option value="computer">The computer</option>
         <option value="online">A friend online</option>
       </select>
+
+      <label class="lbl lbl--spaced" for="tc">Clock</label>
+      <select id="tc" data-tc>
+        <option value="0">No clock</option>
+        <option value="60+0">1 + 0 &nbsp;· bullet</option>
+        <option value="180+2">3 + 2 &nbsp;· blitz</option>
+        <option value="300+3">5 + 3 &nbsp;· blitz</option>
+        <option value="600+0">10 + 0 &nbsp;· rapid</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <div class="row2" data-tc-custom hidden>
+        <div>
+          <label class="lbl" for="tcMin">Minutes</label>
+          <input id="tcMin" type="number" min="0" max="180" step="1" value="5" data-tc-min />
+        </div>
+        <div>
+          <label class="lbl" for="tcInc">Increment, seconds</label>
+          <input id="tcInc" type="number" min="0" max="60" step="1" value="3" data-tc-inc />
+        </div>
+      </div>
 
       <div data-only="computer" hidden>
         <div class="row2">

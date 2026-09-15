@@ -22,6 +22,9 @@ private online room with a friend.
 6. Win **three small boards in a row** to win the game. If every square is
    filled and nobody has three in a row, the game is drawn.
 
+A won small board is ruled through, the way you would strike one out on paper,
+and the three boards that win the game are ruled through too.
+
 Rules 3 and 4 are the house variant this version plays; other versions send you
 anywhere as soon as a board has merely been *won*, which makes for a shorter,
 looser game.
@@ -45,6 +48,15 @@ nothing else. Both players need the page open at the same time.
 If your friend's phone drops off the network mid-game, the page says so within
 about fifteen seconds. The room stays open: they can rejoin with the same code
 and carry on from the current position.
+
+## The clock
+
+Optional, and off until you choose it: bullet, blitz and rapid presets, or set
+your own minutes and increment. The clock does not start until the first move,
+each move adds the increment, and taking a move back puts the clock back too.
+Run out of time and you lose the game, as at chess. In an online game the clock
+belongs to whoever opened the room, so the two sides can never disagree about
+it.
 
 ## The computer opponent
 

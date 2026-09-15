@@ -81,10 +81,28 @@ ok(s.over === true, "game is over");
 ok(JSON.stringify(s.winLine) === JSON.stringify([0, 1, 2]), "winning line reported");
 ok(E.legalMoves(s, []).length === 0, "no moves once the game is over");
 
+/* 5b. the line that won a small board is remembered, and not overwritten */
+var bl = E.create();
+bl.mx[0] = 0b000000011;                 /* X already holds squares 0 and 1 */
+bl.turn = E.X; bl.forced = 0;
+E.apply(bl, 0 * 9 + 2);                  /* and completes the top row */
+ok(bl.bw[0] === E.X, "X owns board 0");
+ok(JSON.stringify(E.LINES[bl.bl[0]]) === JSON.stringify([0, 1, 2]),
+   "the winning line of a small board is recorded");
+var wasLine = bl.bl[0];
+bl.mo[0] = 0b000011000;                  /* O holds squares 3 and 4 there */
+bl.turn = E.O; bl.forced = 0;
+E.apply(bl, 0 * 9 + 5);                  /* and makes the middle row */
+ok(bl.bw[0] === E.X, "the board still belongs to whoever won it first");
+ok(bl.bl[0] === wasLine, "a later line in that board does not replace the recorded one");
+ok(E.create().bl[0] === -1, "a board with no line records none");
+
 /* 6. pack / unpack round trip (used by the network) */
 var back = E.unpack(JSON.parse(JSON.stringify(E.pack(s))));
 ok(back.winner === s.winner && back.bigX === s.bigX && back.mx[2] === s.mx[2],
    "state survives a round trip through the network");
+var backBl = E.unpack(JSON.parse(JSON.stringify(E.pack(bl))));
+ok(backBl.bl[0] === bl.bl[0], "the struck-through lines survive the trip too");
 
 /* 7. a full random game always terminates in a legal, decided position */
 for (var t = 0; t < 400; t++) {

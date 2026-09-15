@@ -57,6 +57,14 @@
     }
   })();
 
+  /* which of the eight lines this set of squares contains, as an index */
+  function lineIndexOf(mask) {
+    for (var i = 0; i < 8; i++) {
+      if ((mask & LINE_MASKS[i]) === LINE_MASKS[i]) return i;
+    }
+    return -1;
+  }
+
   function lineOf(mask) {
     for (var i = 0; i < 8; i++) {
       if ((mask & LINE_MASKS[i]) === LINE_MASKS[i]) return LINES[i];
@@ -72,10 +80,14 @@
      turn      X or O
      filled    squares played so far, 0-81                                   */
   function create() {
+    var bl = new Int8Array(9);
+    bl.fill(-1);
     return {
       mx: new Int16Array(9),
       mo: new Int16Array(9),
       bw: new Int8Array(9),
+      /* which line won each small board, so it can be struck through */
+      bl: bl,
       bigX: 0, bigO: 0,
       forced: -1,
       turn: X,
@@ -90,7 +102,7 @@
   function clone(s) { return copyInto(create(), s); }
 
   function copyInto(dst, src) {
-    dst.mx.set(src.mx); dst.mo.set(src.mo); dst.bw.set(src.bw);
+    dst.mx.set(src.mx); dst.mo.set(src.mo); dst.bw.set(src.bw); dst.bl.set(src.bl);
     dst.bigX = src.bigX; dst.bigO = src.bigO;
     dst.forced = src.forced; dst.turn = src.turn;
     dst.winner = src.winner; dst.over = src.over;
@@ -158,6 +170,7 @@
       var own = p === X ? s.mx[b] : s.mo[b];
       if (WIN[own]) {
         s.bw[b] = p;
+        s.bl[b] = lineIndexOf(own);
         if (p === X) s.bigX |= (1 << b); else s.bigO |= (1 << b);
         var big = p === X ? s.bigX : s.bigO;
         if (WIN[big]) { s.winner = p; s.over = true; s.winLine = lineOf(big); }
@@ -181,6 +194,7 @@
       mx: Array.prototype.slice.call(s.mx),
       mo: Array.prototype.slice.call(s.mo),
       bw: Array.prototype.slice.call(s.bw),
+      bl: Array.prototype.slice.call(s.bl),
       bigX: s.bigX, bigO: s.bigO, forced: s.forced, turn: s.turn,
       winner: s.winner, over: s.over, filled: s.filled,
       last: s.last, winLine: s.winLine
@@ -191,6 +205,7 @@
     var s = create();
     if (!o || !o.mx || o.mx.length !== 9) return s;
     s.mx.set(o.mx); s.mo.set(o.mo); s.bw.set(o.bw);
+    if (o.bl && o.bl.length === 9) s.bl.set(o.bl);
     s.bigX = o.bigX | 0; s.bigO = o.bigO | 0;
     s.forced = o.forced | 0; s.turn = o.turn === O ? O : X;
     s.winner = o.winner | 0; s.over = !!o.over; s.filled = o.filled | 0;
@@ -207,6 +222,6 @@
     create: create, clone: clone, copyInto: copyInto,
     at: at, occ: occ, isFull: isFull, activeBoard: activeBoard,
     legalMoves: legalMoves, isLegal: isLegal, apply: apply,
-    lineOf: lineOf, pack: pack, unpack: unpack
+    lineOf: lineOf, lineIndexOf: lineIndexOf, pack: pack, unpack: unpack
   };
 })(typeof window !== "undefined" ? window : globalThis);

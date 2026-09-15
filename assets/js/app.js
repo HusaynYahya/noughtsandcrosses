@@ -27,6 +27,30 @@
     return FILES.charAt(col) + (9 - row);
   }
 
+  /* A line ruled through the three squares that won, the way you would
+     strike through a won game on paper. Drawn in a hundred-unit box, so the
+     same code serves a small board, the whole board, and the little
+     overall-game grid. */
+  function strike(lineIndex, width) {
+    var L = E.LINES[lineIndex];
+    if (!L) return "";
+    var a = centre(L[0]), z = centre(L[2]);
+    var dx = z.x - a.x, dy = z.y - a.y;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var over = 9;                                  /* run past both ends */
+    var ax = a.x - dx / len * over, ay = a.y - dy / len * over;
+    var zx = z.x + dx / len * over, zy = z.y + dy / len * over;
+    return '<svg class="strike" viewBox="0 0 100 100" preserveAspectRatio="none" ' +
+           'aria-hidden="true" focusable="false"><line class="strike__line" ' +
+           'x1="' + ax.toFixed(1) + '" y1="' + ay.toFixed(1) + '" ' +
+           'x2="' + zx.toFixed(1) + '" y2="' + zy.toFixed(1) + '" ' +
+           'stroke-width="' + width + '"/></svg>';
+  }
+
+  function centre(i) {
+    return { x: (i % 3) * (100 / 3) + 100 / 6, y: ((i / 3) | 0) * (100 / 3) + 100 / 6 };
+  }
+
   var MARK = {};
   MARK[X] = '<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">' +
             '<path class="mark-path" d="M24 24 L76 76"/>' +
@@ -61,6 +85,10 @@
       joinInput = $("[data-join-code]"),
       overallEl = $("[data-overall]"),
       movesEl   = $("[data-moves]"),
+      tcSel     = $("[data-tc]"),
+      tcCustom  = $("[data-tc-custom]"),
+      tcMin     = $("[data-tc-min]"),
+      tcInc     = $("[data-tc-inc]"),
       ranksEl   = $("[data-ranks]"),
       filesEl   = $("[data-files]"),
       chatEl    = $("[data-chat]"),
@@ -75,6 +103,13 @@
   var minis = [];                 /* 9 small boards */
   var overall = [];               /* 9 squares of the overall-game grid */
   var moves = [];                 /* every move played, in order */
+  var boardStrike = null, overallStrike = null;
+
+  /* The clock. Times are kept in milliseconds; the side that is running has
+     the time since its last reading taken off as it is drawn, so the count
+     stays true even when the tab has been asleep. A player whose time runs
+     out loses, as at chess. */
+  var clock = { on: false, base: 0, inc: 0, left: {}, running: 0, since: 0, flagged: 0 };
 
   function buildBoard() {
     var frag = document.createDocumentFragment();
@@ -108,12 +143,19 @@
       rk.textContent = String(9 - f);
       ranksEl.appendChild(rk);
     }
+    boardStrike = document.createElement("span");
+    boardStrike.className = "ubk__strike";
+    boardEl.appendChild(boardStrike);
+
     for (var i = 0; i < 9; i++) {
       var sq = document.createElement("span");
       sq.className = "overall__sq";
       overallEl.appendChild(sq);
       overall[i] = sq;
     }
+    overallStrike = document.createElement("span");
+    overallStrike.className = "overall__strike";
+    overallEl.appendChild(overallStrike);
     boardEl.addEventListener("click", function (ev) {
       var btn = ev.target.closest(".cell");
       if (btn && !btn.disabled) play(+btn.dataset.move);
@@ -130,6 +172,7 @@
 
   function play(move) {
     if (!myTurn() || !E.isLegal(state, move)) return;
+    if (clock.on && !clock.running) { clock.running = state.turn; clock.since = Date.now(); }
 
     if (mode === "online" && net.role === "guest") {
       /* Play it here at once so the board feels immediate; the referee's copy
@@ -145,9 +188,12 @@
   }
 
   function advance(move) {
-    past.push(E.pack(state));
+    past.push({ s: E.pack(state), c: [clock.left[X], clock.left[O]] });
     moves.push(move);
+    var mover = state.turn;
     E.apply(state, move);
+    clockAfterMove(mover);
+    if (state.over) clockStop();
     render(move);
     if (state.over) finishGame();
   }
@@ -182,6 +228,110 @@
     if (cancelThinking) { cancelThinking(); cancelThinking = null; }
   }
 
+  /* ---- the clock ------------------------------------------------------- */
+  function clockSet(baseMs, incMs) {
+    clock.base = baseMs;
+    clock.inc = incMs;
+    clock.on = baseMs > 0;
+    clockReset();
+  }
+
+  function clockReset() {
+    clock.left[X] = clock.base;
+    clock.left[O] = clock.base;
+    clock.running = 0;
+    clock.since = 0;
+    clock.flagged = 0;
+  }
+
+  /* take off however long the running side has been thinking */
+  function clockSettle() {
+    if (!clock.running || !clock.since) return;
+    var now = Date.now();
+    clock.left[clock.running] = Math.max(0, clock.left[clock.running] - (now - clock.since));
+    clock.since = now;
+  }
+
+  function clockAfterMove(mover) {
+    if (!clock.on || state.over) { clock.running = 0; return; }
+    clockSettle();
+    clock.left[mover] += clock.inc;
+    clock.running = state.turn;
+    clock.since = Date.now();
+  }
+
+  function clockStop() { clockSettle(); clock.running = 0; }
+
+  /* Only one copy of the game decides a flag: in an online game that is the
+     player who opened the room, so the two can never disagree. */
+  function mayFlag() { return mode !== "online" || (net && net.role === "host"); }
+
+  function clockTick() {
+    if (!clock.on) return;
+    clockSettle();
+    if (clock.running && clock.left[clock.running] <= 0 && !state.over && mayFlag()) {
+      var loser = clock.running;
+      clock.flagged = loser;
+      clock.running = 0;
+      state.over = true;
+      state.winner = loser === X ? O : X;
+      state.winLine = null;
+      finishGame();
+      if (mode === "online") broadcast();
+      stopThinking();
+      render();               /* the whole page, not just the clocks */
+      return;
+    }
+    renderClocks();
+  }
+
+  function clockText(ms) {
+    if (ms <= 0) return "0:00";
+    var s = ms / 1000;
+    var m = Math.floor(s / 60);
+    var r = s - m * 60;
+    if (ms < 20000) return m + ":" + (r < 10 ? "0" : "") + r.toFixed(1);
+    return m + ":" + (Math.floor(r) < 10 ? "0" : "") + Math.floor(r);
+  }
+
+  function renderClocks() {
+    for (var side = 1; side <= 2; side++) {
+      var where = side === seatHome() ? "home" : "away";
+      var el = document.querySelector('[data-seat-clock="' + where + '"]');
+      el.hidden = !clock.on;
+      if (!clock.on) continue;
+      var ms = clock.left[side];
+      if (clock.running === side && clock.since) ms = Math.max(0, ms - (Date.now() - clock.since));
+      el.textContent = clockText(ms);
+      el.className = "seat__clock" +
+        (ms <= 0 ? " seat__clock--out" : ms < 20000 ? " seat__clock--low" : "");
+    }
+  }
+
+  function seatHome() {
+    return mode === "online" ? seat : (mode === "computer" ? mySide : X);
+  }
+
+  /* what the controls are asking for, in milliseconds */
+  function readTimeControl() {
+    var v = tcSel.value;
+    tcCustom.hidden = v !== "custom";
+    if (v === "0") return [0, 0];
+    if (v === "custom") {
+      var mins = Math.max(0, Math.min(180, +tcMin.value || 0));
+      var inc = Math.max(0, Math.min(60, +tcInc.value || 0));
+      return [mins * 60000, inc * 1000];
+    }
+    var parts = v.split("+");
+    return [(+parts[0] || 0) * 1000, (+parts[1] || 0) * 1000];
+  }
+
+  function applyTimeControl() {
+    var tc = readTimeControl();
+    clockSet(tc[0], tc[1]);
+    reset(mode === "online" && net && net.role === "host");
+  }
+
   /* ---- drawing --------------------------------------------------------- */
   function render(justPlayed) {
     var live = E.activeBoard(state);
@@ -200,7 +350,9 @@
       else if (!state.over && !free && !playable) cls += " mini--shut";
       if (state.winLine && state.winLine.indexOf(b) > -1) cls += " mini--won-line";
       mini.el.className = cls;
-      mini.glyph.innerHTML = (owner === X || owner === O) ? MARK[owner] : "";
+      var wantStrike = (owner === X || owner === O) && state.bl[b] >= 0
+        ? strike(state.bl[b], 7) : "";
+      if (mini.glyph.innerHTML !== wantStrike) mini.glyph.innerHTML = wantStrike;
 
       for (var sq = 0; sq < 9; sq++) {
         var i = b * 9 + sq, btn = cells[i], who = E.at(state, b, sq);
@@ -218,9 +370,16 @@
       }
     }
 
-    renderOverall(live);
+    var big = state.over && state.winner && state.winLine
+      ? E.lineIndexOf(state.winner === X ? state.bigX : state.bigO) : -1;
+    var bigCls = state.winner === X ? " is-x" : " is-o";
+    boardStrike.className = "ubk__strike" + (big >= 0 ? bigCls : "");
+    boardStrike.innerHTML = big >= 0 ? strike(big, 3.2) : "";
+
+    renderOverall(live, big, bigCls);
     renderMoves();
     renderSeats();
+    renderClocks();
     boardEl.classList.toggle("is-thinking", !!cancelThinking);
     boardEl.classList.toggle("ubk--free", free && canMove);
     renderStatus(free, live);
@@ -287,7 +446,7 @@
   }
 
   /* The nine boards in miniature, and the count underneath. */
-  function renderOverall(live) {
+  function renderOverall(live, big, bigCls) {
     var x = 0, o = 0, dead = 0, b;
     for (b = 0; b < 9; b++) {
       var owner = state.bw[b], cls = "overall__sq";
@@ -300,6 +459,9 @@
       var want = (owner === X || owner === O) ? MARK[owner] : "";
       if (overall[b].innerHTML !== want) overall[b].innerHTML = want;
     }
+
+    overallStrike.className = "overall__strike" + (big >= 0 ? bigCls : "");
+    overallStrike.innerHTML = big >= 0 ? strike(big, 5) : "";
 
     var open = 9 - x - o - dead;
     var parts = ["Crosses <b>" + x + "</b>", "Noughts <b>" + o + "</b>"];
@@ -323,9 +485,11 @@
 
     if (state.over) {
       dot = "none";
-      text = state.winner
-        ? SIDE[state.winner] + " win — three boards in a row."
-        : "A drawn game — every square filled, nobody with three boards in a row.";
+      text = !state.winner
+        ? "A drawn game — every square filled, nobody with three boards in a row."
+        : clock.flagged
+          ? SIDE[state.winner] + " win — " + SIDE[clock.flagged].toLowerCase() + " ran out of time."
+          : SIDE[state.winner] + " win — three boards in a row.";
     } else if (mode === "online" && (!net || !net.connected())) {
       text = netStatusText || "Not connected yet.";
     } else if (cancelThinking) {
@@ -356,6 +520,7 @@
     past = [];
     moves = [];
     counted = false;
+    clockReset();
     render();
     if (mode === "computer") computerTurn();
     if (mode === "online" && net && net.role === "host" && broadcastIt !== false) broadcast();
@@ -364,13 +529,20 @@
   function undo() {
     if (mode === "online" || !past.length) return;
     stopThinking();
-    state = E.unpack(past.pop());
+    var back = past.pop();
+    state = E.unpack(back.s);
+    clock.left[X] = back.c[0]; clock.left[O] = back.c[1];
     moves.pop();
     /* in a game against the computer, step back past its reply too */
     if (mode === "computer" && state.turn !== mySide && past.length) {
-      state = E.unpack(past.pop());
+      back = past.pop();
+      state = E.unpack(back.s);
+      clock.left[X] = back.c[0]; clock.left[O] = back.c[1];
       moves.pop();
     }
+    clock.running = clock.on && moves.length ? state.turn : 0;
+    clock.since = Date.now();
+    clock.flagged = 0;
     counted = false;
     render();
   }
@@ -419,8 +591,11 @@
   /* ---- the private room ------------------------------------------------ */
   function broadcast() {
     if (!net || net.role !== "host") return;
+    clockSettle();
     net.send({ t: "sync", state: E.pack(state), seat: seat === X ? O : X,
-               tally: tally, moves: moves });
+               tally: tally, moves: moves,
+               clock: { on: clock.on, base: clock.base, inc: clock.inc,
+                        x: clock.left[X], o: clock.left[O], running: clock.running } });
   }
 
   function netStatus(text, kind) {
@@ -477,6 +652,15 @@
         state = E.unpack(msg.state);
         if (msg.tally) { tally = msg.tally; renderTally(); }
         moves = Array.isArray(msg.moves) ? msg.moves.slice() : [];
+        if (msg.clock) {
+          clock.on = !!msg.clock.on;
+          clock.base = msg.clock.base | 0;
+          clock.inc = msg.clock.inc | 0;
+          clock.left[X] = msg.clock.x | 0;
+          clock.left[O] = msg.clock.o | 0;
+          clock.running = msg.clock.running | 0;
+          clock.since = Date.now();
+        }
         counted = state.over;
         past = [];
         render(state.last);
@@ -569,6 +753,9 @@
       reset(false);
     });
     undoBtn.addEventListener("click", undo);
+    tcSel.addEventListener("change", applyTimeControl);
+    tcMin.addEventListener("change", applyTimeControl);
+    tcInc.addEventListener("change", applyTimeControl);
     $("[data-host]").addEventListener("click", hostRoom);
     $("[data-join]").addEventListener("click", function () { joinRoom(); });
     joinInput.addEventListener("keydown", function (ev) {
@@ -613,6 +800,8 @@
   wire();
   clearChat();
   chatReady();
+  clockSet.apply(null, readTimeControl());
+  setInterval(clockTick, 100);
   loadTally();
   renderTally();
 
