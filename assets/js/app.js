@@ -275,7 +275,14 @@
         render();
       },
       message: onMessage,
-      close: function () { render(); }
+      close: function () { render(); },
+      error: function () {
+        if (net && net.role === "guest" && !net.connected()) {
+          setupBox.hidden = false;
+          liveBox.hidden = true;
+        }
+        render();
+      }
     });
     return net;
   }
@@ -335,6 +342,7 @@
     var tidy = NET.tidyCode(code || joinInput.value);
     if (!tidy) { netStatus("Type the room code first.", "error"); return; }
     if (net) net.close();
+    joinInput.value = tidy;            /* show what was actually read */
     seat = O;
     startSession().join(tidy).then(function () {
       showRoom(tidy);

@@ -27,6 +27,9 @@
     "saffron sable sienna slate sorrel tangle teal thistle topaz umber velvet " +
     "walnut willow zephyr").split(" ");
 
+  var WORD_SET = {};
+  WORDS.forEach(function (w) { WORD_SET[w] = true; });
+
   function coin(n) { return Math.floor(Math.random() * n); }
 
   function makeCode() {
@@ -35,11 +38,21 @@
     return out.join("-");
   }
 
+  /* People paste all sorts of things in here: the bare code, the whole link,
+     the entire invitation message, or the words read out with spaces and
+     capitals. Pull the four code words out of whatever arrives. */
   function tidyCode(raw) {
-    return String(raw || "").toLowerCase().trim()
-      .replace(/^.*#/, "")           /* let somebody paste the whole link */
-      .replace(/[^a-z]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+    var text = String(raw || "").toLowerCase();
+    var hash = text.lastIndexOf("#");
+    if (hash > -1) text = text.slice(hash + 1);          /* prefer the link's code */
+    var words = text.split(/[^a-z]+/).filter(Boolean);
+    var known = words.filter(function (w) { return WORD_SET[w]; });
+    /* Codes are built from a known list, so the real words can be picked out
+       of surrounding chatter such as "(room code: …)". If the code has been
+       mistyped, fall back to the first four words so the message back can
+       name exactly what was read. */
+    var use = known.length >= 4 ? known.slice(0, 4) : words.slice(0, 4);
+    return use.join("-");
   }
 
   /* ---- loading PeerJS on demand ---------------------------------------- */
@@ -72,6 +85,7 @@
      tidily, and a game that silently stops taking moves is worse than one
      that says so. */
   var BEAT_MS = 4000, SILENCE_MS = 14000;
+  var KNOCK_MS = 7000, TRIES = 4;   /* how long, and how often, to knock */
 
   function session(handlers) {
     var h = handlers || {};
@@ -108,13 +122,13 @@
     function wire(c) {
       conn = c;
       c.on("open", function () {
-        if (closed) return;
+        if (closed || conn !== c) return;
         startBeat();
         say("Connected.", "live");
         if (h.open) h.open();
       });
       c.on("data", function (raw) {
-        if (closed) return;
+        if (closed || conn !== c) return;
         lastHeard = Date.now();
         if (!h.message) return;
         var msg = raw;
@@ -124,7 +138,7 @@
         }
       });
       c.on("close", function () {
-        if (closed || !conn) return;
+        if (closed || conn !== c) return;
         conn = null;
         stopBeat();
         say(api.role === "host"
@@ -175,25 +189,41 @@
         say("Looking for the room…");
         return loadPeer().then(function (Peer) {
           return new Promise(function (resolve, reject) {
+            var tries = 0, timer = null;
+
             peer = new Peer({ debug: 0 });
-            peer.on("open", function () {
-              wire(peer.connect(PREFIX + api.code, { reliable: true }));
-              /* If nobody is listening, PeerJS reports it through peer error. */
-              setTimeout(function () {
-                if (!closed && (!conn || !conn.open)) {
-                  say("Still knocking… make sure the code is exactly right.", "waiting");
-                }
-              }, 6000);
-              resolve(api.code);
-            });
+            peer.on("open", function () { knock(); resolve(api.code); });
             peer.on("error", function (err) {
-              if (err && err.type === "peer-unavailable") {
-                fail(new Error("No room with that code. Check it, and that your " +
-                               "friend still has the page open."), reject);
-                return;
-              }
+              /* The room not being registered yet is worth another knock —
+                 the broker can take a moment to catch up with a new room. */
+              if (err && err.type === "peer-unavailable") { again(); return; }
               fail(err, reject);
             });
+
+            function knock() {
+              if (closed) return;
+              tries++;
+              say(tries === 1 ? "Knocking on the room door…"
+                              : "Still knocking — attempt " + tries + " of " + TRIES + "…");
+              var c = peer.connect(PREFIX + api.code, { reliable: true });
+              wire(c);
+              clearTimeout(timer);
+              timer = setTimeout(function () {
+                if (closed || (conn && conn.open)) return;
+                try { c.close(); } catch (e) {}
+                again();
+              }, KNOCK_MS);
+            }
+
+            function again() {
+              if (closed || (conn && conn.open)) return;
+              clearTimeout(timer);
+              if (tries < TRIES) { setTimeout(knock, 900); return; }
+              var why = new Error("No room called \u201c" + api.code + "\u201d. Check the " +
+                "code is exactly right, and that your friend still has the page open.");
+              say(why.message, "error");
+              if (h.error) h.error(why);
+            }
           });
         });
       },
