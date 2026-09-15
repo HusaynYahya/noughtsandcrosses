@@ -66,6 +66,32 @@ keeps the moves that tend to end well. It thinks in short slices so the page
 never freezes, and it is given between 0.4 and 2.2 seconds depending on the
 level.
 
+## The analysis board
+
+Switch it on and the search reads the position after every move and says three
+things:
+
+- **How it stands** — a bar, and a number: the chance each side ends up
+  winning, as the search found it.
+- **What to play** — the move it would choose, ringed on the board, with the
+  next best alternatives and what each is worth.
+- **How it goes on** — the line it expects: the move it examined most, then
+  that move's most-examined reply, and on down.
+
+It also marks the moves already played. A move is judged the way a chess site
+judges one: how the position stood for you before you moved, against how it
+stands for you after. Give ground and the move is marked **?!** for an
+inaccuracy, **?** for a mistake, **??** for a blunder — and a move that ends a
+game which was still alive is called a blunder whatever the arithmetic says,
+because that is the moment worth pointing at.
+
+The two readings come from separate searches, so a point or two of noise is
+expected; the thresholds are set well clear of it. It is a search, not an
+oracle: on a fresh position it is reading a few thousand playouts, and it will
+sometimes change its mind.
+
+Best left switched off while you are playing somebody.
+
 ## Running it
 
 It is a static page with no build step. Open `index.html`, or serve the folder:
@@ -95,7 +121,8 @@ network, and that the computer takes a win when one is on offer.
 | `index.html` | The page |
 | `assets/css/game.css` | All the styling; the design tokens are at the top |
 | `assets/js/engine.js` | The rules. No DOM, no network |
-| `assets/js/ai.js` | The computer opponent |
+| `assets/js/ai.js` | The search: Monte-Carlo tree search, in slices |
+| `assets/js/analysis.js` | The analysis board: reading the search tree |
 | `assets/js/net.js` | Private rooms, peer to peer |
 | `assets/js/app.js` | Drawing the board and wiring the controls |
 | `test/engine.test.js` | Rules tests |

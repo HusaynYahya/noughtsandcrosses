@@ -8,6 +8,7 @@
   "use strict";
 
   var E = window.UNC.engine, AI = window.UNC.ai, NET = window.UNC.net;
+  var AN = window.UNC.analysis;
   var X = E.X, O = E.O;
 
   var BOARDS = ["top left", "top centre", "top right",
@@ -85,6 +86,15 @@
       joinInput = $("[data-join-code]"),
       overallEl = $("[data-overall]"),
       movesEl   = $("[data-moves]"),
+      anToggle  = $("[data-an-toggle]"),
+      anState   = $("[data-an-state]"),
+      anBody    = $("[data-an-body]"),
+      anBest    = $("[data-an-best]"),
+      anPv      = $("[data-an-pv]"),
+      anCands   = $("[data-an-cands]"),
+      anSide    = $("[data-an-side]"),
+      anEvalBar = $("[data-eval-fill]"),
+      anEvalTxt = $("[data-eval-text]"),
       tcSel     = $("[data-tc]"),
       tcCustom  = $("[data-tc-custom]"),
       tcMin     = $("[data-tc-min]"),
@@ -110,6 +120,12 @@
      stays true even when the tab has been asleep. A player whose time runs
      out loses, as at chess. */
   var clock = { on: false, base: 0, inc: 0, left: {}, running: 0, since: 0, flagged: 0 };
+
+  /* The analysis board. `marks` holds a verdict per move, in step with
+     `moves`; `standing` is how the position stood for the player to move,
+     kept so the next move can be judged against it. */
+  var analysis = { on: false, cancel: null, report: null, marks: [],
+                   standing: null, pending: null, busy: false };
 
   function buildBoard() {
     var frag = document.createDocumentFragment();
@@ -190,11 +206,13 @@
   function advance(move) {
     past.push({ s: E.pack(state), c: [clock.left[X], clock.left[O]] });
     moves.push(move);
+    analysisNote(moves.length - 1);
     var mover = state.turn;
     E.apply(state, move);
     clockAfterMove(mover);
     if (state.over) clockStop();
     render(move);
+    analysisRun();
     if (state.over) finishGame();
   }
 
@@ -226,6 +244,87 @@
 
   function stopThinking() {
     if (cancelThinking) { cancelThinking(); cancelThinking = null; }
+  }
+
+  /* ---- the analysis board ---------------------------------------------- */
+  /* Every time the position changes, look at it again. The reading for the
+     position before a move is kept, so when that move is played the two
+     readings can be set side by side and the move judged. */
+  function analysisRun() {
+    if (analysis.cancel) { analysis.cancel(); analysis.cancel = null; }
+    if (!analysis.on) { analysis.busy = false; renderAnalysis(); return; }
+    analysis.busy = true;
+    renderAnalysis();
+    var forState = E.clone(state);
+    analysis.cancel = AN.analyse(forState, 900, function (report) {
+      analysis.cancel = null;
+      analysis.busy = false;
+      /* the position may have moved on while we were thinking */
+      if (forState.filled !== state.filled || forState.turn !== state.turn) return;
+      analysis.report = report;
+
+      if (analysis.pending) {
+        var p = analysis.pending;
+        analysis.pending = null;
+        var mine = 100 - report.score;          /* from the mover's side */
+        var verdict = AN.judge(p.before, mine, true);
+        if (verdict) analysis.marks[p.index] = verdict;
+        renderMoves();
+      }
+      analysis.standing = report.score;
+      render();
+    });
+  }
+
+  /* called as a move is played, so the move can be judged once the new
+     position has been read */
+  function analysisNote(index) {
+    if (!analysis.on || analysis.standing == null) { analysis.standing = null; return; }
+    analysis.pending = { index: index, before: analysis.standing };
+    analysis.standing = null;
+  }
+
+  function analysisReset() {
+    if (analysis.cancel) { analysis.cancel(); analysis.cancel = null; }
+    analysis.report = null;
+    analysis.marks = [];
+    analysis.standing = null;
+    analysis.pending = null;
+    analysis.busy = false;
+  }
+
+  function renderAnalysis() {
+    anBody.hidden = !analysis.on;
+    anState.textContent = analysis.on ? (analysis.busy ? "…" : "on") : "off";
+    if (!analysis.on) return;
+
+    var r = analysis.report;
+    anBody.classList.toggle("an__thinking", analysis.busy && !r);
+    if (!r) {
+      anEvalBar.style.width = "50%";
+      anEvalTxt.textContent = "Reading the position…";
+      anBest.textContent = "—";
+      anPv.textContent = "—";
+      anCands.innerHTML = "";
+      return;
+    }
+
+    /* the bar always shows it from the crosses' side */
+    var forX = r.turn === X ? r.score : 100 - r.score;
+    anEvalBar.style.width = forX + "%";
+    anEvalTxt.textContent = r.over
+      ? (state.winner ? SIDE[state.winner] + " won" : "Drawn")
+      : forX >= 50
+        ? "Crosses " + Math.round(forX) + "%"
+        : "Noughts " + Math.round(100 - forX) + "%";
+
+    anSide.textContent = SIDE[r.turn || state.turn].toLowerCase();
+    anBest.textContent = r.best >= 0 ? notate(r.best) : "—";
+    anPv.textContent = r.pv.length ? r.pv.map(notate).join(" ") : "—";
+    anCands.innerHTML = r.candidates.map(function (c) {
+      return "<li><span>" + notate(c.move) + "</span><span>" +
+             Math.round(c.score) + "%</span></li>";
+    }).join("");
   }
 
   /* ---- the clock ------------------------------------------------------- */
@@ -283,6 +382,7 @@
       return;
     }
     renderClocks();
+    renderAnalysis();
   }
 
   function clockText(ms) {
@@ -335,6 +435,8 @@
   /* ---- drawing --------------------------------------------------------- */
   function render(justPlayed) {
     var live = E.activeBoard(state);
+    var bestSquare = analysis.on && analysis.report && !state.over
+      ? analysis.report.best : -1;
     var free = live < 0 && !state.over;
     var canMove = myTurn();
 
@@ -362,6 +464,7 @@
         else if (open) c += " cell--open";
         if (i === state.last) c += " cell--last";
         if (i === justPlayed) c += " cell--fresh";
+        if (i === bestSquare) c += " cell--best";
         btn.className = c;
         btn.disabled = !(open && canMove);
         var want = who ? MARK[who] : "";
@@ -380,6 +483,7 @@
     renderMoves();
     renderSeats();
     renderClocks();
+    renderAnalysis();
     boardEl.classList.toggle("is-thinking", !!cancelThinking);
     boardEl.classList.toggle("ubk--free", free && canMove);
     renderStatus(free, live);
@@ -398,9 +502,17 @@
       var no = (i / 2) + 1;
       html += '<div class="mv"><span class="mv__no">' + no + '</span>' +
               '<span class="mv__x' + (i === moves.length - 1 ? " mv__now" : "") + '">' +
-              notate(moves[i]) + '</span>' +
+              notate(moves[i]) + markup(i) + '</span>' +
               '<span class="mv__o' + (i + 1 === moves.length - 1 ? " mv__now" : "") + '">' +
-              (moves[i + 1] != null ? notate(moves[i + 1]) : "") + '</span></div>';
+              (moves[i + 1] != null ? notate(moves[i + 1]) + markup(i + 1) : "") + '</span></div>';
+    }
+
+    function markup(i) {
+      var v = analysis.marks[i];
+      if (!v) return "";
+      var kind = v.mark === "??" ? "blunder" : v.mark === "?" ? "mistake" : "dubious";
+      return ' <span class="mv__mark mv__mark--' + kind + '" title="' +
+             v.name + ", " + v.loss + ' points given away">' + v.mark + '</span>';
     }
     movesEl.innerHTML = html;
     movesEl.scrollTop = movesEl.scrollHeight;
@@ -521,6 +633,7 @@
     moves = [];
     counted = false;
     clockReset();
+    analysisReset();
     render();
     if (mode === "computer") computerTurn();
     if (mode === "online" && net && net.role === "host" && broadcastIt !== false) broadcast();
@@ -543,6 +656,9 @@
     clock.running = clock.on && moves.length ? state.turn : 0;
     clock.since = Date.now();
     clock.flagged = 0;
+    analysis.marks.length = moves.length;
+    analysis.standing = null;
+    analysis.pending = null;
     counted = false;
     render();
   }
@@ -753,6 +869,12 @@
       reset(false);
     });
     undoBtn.addEventListener("click", undo);
+    anToggle.addEventListener("change", function () {
+      analysis.on = anToggle.checked;
+      if (!analysis.on) analysisReset();
+      render();                       /* clears the marked square too */
+      if (analysis.on) analysisRun();
+    });
     tcSel.addEventListener("change", applyTimeControl);
     tcMin.addEventListener("change", applyTimeControl);
     tcInc.addEventListener("change", applyTimeControl);
@@ -800,6 +922,7 @@
   wire();
   clearChat();
   chatReady();
+  renderAnalysis();
   clockSet.apply(null, readTimeControl());
   setInterval(clockTick, 100);
   loadTally();

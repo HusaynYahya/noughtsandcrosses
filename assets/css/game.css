@@ -207,6 +207,12 @@ body {
 .cell--open:hover { background: var(--live); }
 .cell--open:focus-visible { outline: 2px solid var(--go-hi); outline-offset: -3px; }
 .cell--last { box-shadow: inset 0 0 0 100px var(--last); }
+/* what the analysis board would play */
+.cell--best::after {
+  content: ""; position: absolute; inset: 12%;
+  border: 2px dashed var(--go-hi); border-radius: 50%;
+  opacity: .8; pointer-events: none;
+}
 .cell svg { width: 66%; height: 66%; aspect-ratio: 1; overflow: visible; position: relative; }
 .cell--x svg { color: var(--x); }
 .cell--o svg { color: var(--o); }
@@ -322,6 +328,43 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .mv__x { color: var(--x); }
 .mv__o { color: var(--o); }
 .mv__now { background: var(--go-dim); box-shadow: inset 2px 0 0 var(--go); }
+
+/* ---- the analysis board ----------------------------------------------- */
+.an__head { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+.an__head .lbl { margin: 0; flex: 1 1 auto; }
+.an__head input { width: auto; flex: none; accent-color: var(--go); cursor: pointer; }
+.an__state { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em;
+             color: var(--text-dim); min-width: 2rem; text-align: right; }
+.an__head input:checked ~ .an__state { color: var(--go-hi); }
+
+/* how the game stands, as a bar: crosses from the left, noughts from the right */
+.evalbar {
+  height: .55rem; margin: .7rem 0 .5rem; background: var(--o);
+  border: 1px solid var(--line); overflow: hidden;
+}
+.evalbar__x { display: block; height: 100%; background: var(--x);
+              transition: width .5s var(--ease); }
+.an__eval { margin: 0 0 .5rem; font-size: .8rem; color: var(--text); }
+.an__eval b { color: var(--text-strong); }
+.an__row { margin: 0 0 .35rem; font-size: .78rem; color: var(--text-dim); }
+.an__row b { color: var(--text-strong); font-family: var(--mono); }
+.an__pv span { font-family: var(--mono); color: var(--text); word-spacing: .3em; }
+.an__cands-head { margin: .6rem 0 .2rem; }
+.an__cands { list-style: none; margin: .5rem 0 0; padding: 0;
+             font-family: var(--mono); font-size: .76rem; }
+.an__cands li { display: flex; justify-content: space-between; gap: .5rem;
+                padding: .2rem .35rem; color: var(--text-dim); }
+.an__cands li:first-child { color: var(--text-strong); background: var(--go-dim); }
+.an__key { margin: .7rem 0 0; font-size: .7rem; color: var(--text-dim);
+           display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.an__key .mv__mark { margin-left: .4rem; }
+.an__thinking { opacity: .55; }
+
+/* the marks beside a move in the list */
+.mv__mark { font-weight: 700; font-family: var(--mono); }
+.mv__mark--dubious { color: #d2b53c; }
+.mv__mark--mistake { color: #e08c3f; }
+.mv__mark--blunder { color: #e0603f; }
 
 /* ---- the overall game, in miniature ----------------------------------- */
 .overall-wrap { display: grid; gap: .6rem; justify-items: center; }

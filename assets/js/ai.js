@@ -1,10 +1,15 @@
 /* ============================================================================
-   ULTIMATE NOUGHTS AND CROSSES — the computer opponent
+   ULTIMATE NOUGHTS AND CROSSES — the search
    ----------------------------------------------------------------------------
    Monte-Carlo tree search. The machine plays thousands of games at random from
    the position in front of it, keeps the moves that tend to end well, and
    explores the promising ones more deeply. It is given a slice of a few
    milliseconds at a time so the page never freezes while it thinks.
+
+   `search` does the work and hands back the tree it built. `think` uses that
+   to pick a move to play; the analysis board reads the same tree to say what
+   it would have played, how good the position is, and how the game might go
+   on from here.
    ============================================================================ */
 (function (root) {
   "use strict";
@@ -68,32 +73,26 @@
   }
 
   /* ---- the search, run in slices --------------------------------------- */
-  function think(state, level, done) {
-    var cfg = LEVELS[level] || LEVELS.steady;
+  /* Calls done(root) when the budget is spent. Returns a function that calls
+     the whole thing off. */
+  function search(state, budget, done) {
     var moves = E.legalMoves(state, []);
-
-    if (!moves.length) { done(-1); return function () {}; }
-    if (moves.length === 1) { finish(moves[0]); return function () {}; }
-
-    /* take a win that is there for the taking, whatever the level */
-    var now = winningMove(state, moves);
-    if (now >= 0 && level !== "gentle") { finish(now); return function () {}; }
-
     var root = node(-1, null, 0, moves.slice());
     var scratch = E.create();
     var buf = [];
-    var iters = 0, deadline = Date.now() + cfg.millis, stopped = false;
+    var iters = 0, deadline = Date.now() + (budget.millis || 800), stopped = false;
+
+    if (!moves.length) { setTimeout(function () { done(root); }, 0); return noop; }
 
     function slice() {
       if (stopped) return;
       var until = Date.now() + SLICE_MS;
-      while (Date.now() < until && iters < cfg.iterations && Date.now() < deadline) {
-        for (var k = 0; k < 16 && iters < cfg.iterations; k++) { iterate(); iters++; }
+      while (Date.now() < until && iters < budget.iterations && Date.now() < deadline) {
+        for (var k = 0; k < 16 && iters < budget.iterations; k++) { iterate(); iters++; }
       }
-      if (iters >= cfg.iterations || Date.now() >= deadline) {
-        var choice = mostVisited(root);
-        if (cfg.blunder && Math.random() < cfg.blunder) choice = pick(moves);
-        finish(choice);
+      if (iters >= budget.iterations || Date.now() >= deadline) {
+        stopped = true;
+        setTimeout(function () { done(root); }, 0);
       } else {
         setTimeout(slice, 0);
       }
@@ -124,21 +123,40 @@
       root.n++;
     }
 
-    function finish(move) {
-      stopped = true;
-      setTimeout(function () { done(move); }, 0);
-    }
-
     setTimeout(slice, 0);
     return function cancel() { stopped = true; };
   }
 
-  function mostVisited(root) {
-    var top = null, n = -1;
-    for (var i = 0; i < root.kids.length; i++) {
-      if (root.kids[i].n > n) { n = root.kids[i].n; top = root.kids[i]; }
+  function noop() {}
+
+  function mostVisited(n) {
+    var top = null, most = -1;
+    for (var i = 0; i < n.kids.length; i++) {
+      if (n.kids[i].n > most) { most = n.kids[i].n; top = n.kids[i]; }
     }
-    return top ? top.move : -1;
+    return top;
+  }
+
+  /* ---- picking a move to play ------------------------------------------ */
+  function think(state, level, done) {
+    var cfg = LEVELS[level] || LEVELS.steady;
+    var moves = E.legalMoves(state, []);
+
+    if (!moves.length) { done(-1); return noop; }
+    if (moves.length === 1) { answer(moves[0]); return noop; }
+
+    /* take a win that is there for the taking, whatever the level */
+    var now = winningMove(state, moves);
+    if (now >= 0 && level !== "gentle") { answer(now); return noop; }
+
+    return search(state, cfg, function (root) {
+      var top = mostVisited(root);
+      var move = top ? top.move : -1;
+      if (cfg.blunder && Math.random() < cfg.blunder) move = pick(moves);
+      answer(move);
+    });
+
+    function answer(move) { setTimeout(function () { done(move); }, 0); }
   }
 
   /* a move that wins the whole game on the spot, or -1 */
@@ -151,5 +169,11 @@
     return -1;
   }
 
-  root.UNC.ai = { think: think, levels: Object.keys(LEVELS) };
+  root.UNC.ai = {
+    think: think,
+    search: search,
+    mostVisited: mostVisited,
+    winningMove: winningMove,
+    levels: Object.keys(LEVELS)
+  };
 })(typeof window !== "undefined" ? window : globalThis);
