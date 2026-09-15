@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
+<meta name="theme-color" content="#14100b" />
+<title>Ultimate Noughts and Crosses</title>
+<link rel="stylesheet" href="assets/css/game.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23c8a24c' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
+</head>
+<body>
+<a class="skip-link" href="#board">Skip to the board</a>
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <span class="brand">
+      <svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <g stroke="currentColor" stroke-width="5" fill="none">
+          <path d="M36 8v84M64 8v84M8 36h84M8 64h84" />
+        </g>
+      </svg>
+      <span class="brand__word">Ultimate <span class="brand__num">Noughts &amp; Crosses</span></span>
+    </span>
+  </div>
+</header>
+
+<main id="main">
+  <section class="section section--tight">
+    <div class="wrap">
+      <p class="eyebrow">Nine boards inside one</p>
+      <h1>Ultimate noughts and crosses</h1>
+      <p class="lede">The square you take decides where your opponent must play. Win three small
+        boards in a row to take the game.</p>
+    </div>
+  </section>
+
+  <section class="section section--top">
+    <div class="wrap game">
+
+      <div class="game__main">
+        <p class="game__status" data-status role="status" aria-live="polite">
+          <span class="game__turn-dot" data-turn="X"></span>
+          <span data-status-text>Crosses to play — anywhere you like.</span>
+        </p>
+
+        <div class="ubk" id="board" data-board role="group"
+             aria-label="Ultimate noughts and crosses board"></div>
+
+        <p class="game__hint" data-hint></p>
+      </div>
+
+      <aside class="panel">
+        <div class="panel__group">
+          <label class="panel__label" for="mode">Opponent</label>
+          <select id="mode" data-mode>
+            <option value="local">Two players, one device</option>
+            <option value="computer">The computer</option>
+            <option value="online">A friend online</option>
+          </select>
+        </div>
+
+        <div class="panel__group" data-only="computer" hidden>
+          <label class="panel__label" for="level">How hard</label>
+          <select id="level" data-level>
+            <option value="gentle">Gentle</option>
+            <option value="steady" selected>Steady</option>
+            <option value="ruthless">Ruthless</option>
+          </select>
+          <label class="panel__label panel__label--spaced" for="side">You play</label>
+          <select id="side" data-side>
+            <option value="1">Crosses — first</option>
+            <option value="2">Noughts — second</option>
+          </select>
+        </div>
+
+        <div class="panel__group" data-only="online" hidden>
+          <span class="panel__label">Private room</span>
+
+          <div data-room-setup>
+            <div class="panel__buttons">
+              <button class="btn" type="button" data-host>Create a room</button>
+            </div>
+            <p class="room__or">or join one</p>
+            <div class="room__join">
+              <input type="text" data-join-code inputmode="latin" autocomplete="off"
+                     spellcheck="false" placeholder="four-word code"
+                     aria-label="Room code" />
+              <button class="btn" type="button" data-join>Join</button>
+            </div>
+          </div>
+
+          <div data-room-live hidden>
+            <p class="room__code" data-room-code></p>
+            <div class="panel__buttons">
+              <button class="btn" type="button" data-copy>Copy invitation</button>
+              <button class="btn" type="button" data-leave>Leave</button>
+            </div>
+          </div>
+
+          <p class="room__status" data-net-status></p>
+        </div>
+
+        <div class="panel__buttons">
+          <button class="btn btn--solid" type="button" data-new>New game</button>
+          <button class="btn" type="button" data-undo>Undo</button>
+        </div>
+
+        <dl class="tally" aria-label="Games won">
+          <div><dt>Crosses</dt><dd data-tally-x>0</dd></div>
+          <div><dt>Noughts</dt><dd data-tally-o>0</dd></div>
+          <div><dt>Drawn</dt><dd data-tally-d>0</dd></div>
+        </dl>
+
+        <details class="rules">
+          <summary>The rules</summary>
+          <ol>
+            <li>Nine small boards sit in one big three-by-three.</li>
+            <li>The <b>square</b> you play in a small board sends your opponent to the
+              <b>small board in that position</b>. Take the top-right square, and they
+              must play in the top-right board.</li>
+            <li>A small board that has already been won is <b>still played in</b> while it
+              has empty squares — but its result never changes. It belongs to whoever
+              won it first.</li>
+            <li>Only when the board you are sent to is <b>completely full</b> may you
+              play wherever you like.</li>
+            <li>A small board that fills up with no line belongs to nobody.</li>
+            <li>Win <b>three small boards in a row</b> to win the game. If every square
+              is filled and nobody has three in a row, the game is drawn.</li>
+          </ol>
+        </details>
+      </aside>
+
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Online games are peer-to-peer: the moves travel straight between the two
+      browsers, and no game is ever stored on a server.</p>
+  </div>
+</footer>
+
+<script src="assets/js/engine.js"></script>
+<script src="assets/js/ai.js"></script>
+<script src="assets/js/net.js"></script>
+<script src="assets/js/app.js" defer></script>
+</body>
+</html>
