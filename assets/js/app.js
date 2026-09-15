@@ -16,6 +16,17 @@
   var SQUARES = BOARDS;
   var SIDE = {}; SIDE[X] = "Crosses"; SIDE[O] = "Noughts";
 
+  var FILES = "abcdefghi";
+
+  /* Squares are named as on a chessboard: files a-i left to right, ranks 1-9
+     bottom to top, counted across the whole nine-by-nine. */
+  function notate(move) {
+    var b = (move / 9) | 0, sq = move % 9;
+    var col = (b % 3) * 3 + (sq % 3);
+    var row = ((b / 3) | 0) * 3 + ((sq / 3) | 0);
+    return FILES.charAt(col) + (9 - row);
+  }
+
   var MARK = {};
   MARK[X] = '<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">' +
             '<path class="mark-path" d="M24 24 L76 76"/>' +
@@ -38,8 +49,7 @@
   var boardEl   = $("[data-board]"),
       statusEl  = $("[data-status]"),
       statusTxt = $("[data-status-text]"),
-      dotEl     = $(".game__turn-dot"),
-      hintEl    = $("[data-hint]"),
+      dotEl     = $(".status__dot"),
       modeSel   = $("[data-mode]"),
       levelSel  = $("[data-level]"),
       sideSel   = $("[data-side]"),
@@ -49,16 +59,30 @@
       liveBox   = $("[data-room-live]"),
       codeEl    = $("[data-room-code]"),
       joinInput = $("[data-join-code]"),
+      overallEl = $("[data-overall]"),
+      movesEl   = $("[data-moves]"),
+      ranksEl   = $("[data-ranks]"),
+      filesEl   = $("[data-files]"),
+      chatEl    = $("[data-chat]"),
+      chatLog   = $("[data-chat-log]"),
+      chatForm  = $("[data-chat-form]"),
+      chatInput = $("[data-chat-input]"),
+      chatSend  = $("[data-chat-send]"),
+      overallCount = $("[data-overall-count]"),
       netEl     = $("[data-net-status]");
 
   var cells = [];                 /* 81 buttons, indexed by move number */
   var minis = [];                 /* 9 small boards */
+  var overall = [];               /* 9 squares of the overall-game grid */
+  var moves = [];                 /* every move played, in order */
 
   function buildBoard() {
     var frag = document.createDocumentFragment();
     for (var b = 0; b < 9; b++) {
       var mini = document.createElement("div");
-      mini.className = "mini";
+      /* light and dark small boards, so the big three-by-three reads at a
+         glance the way a chessboard does */
+      mini.className = "mini" + (b % 2 === 0 ? " mini--light" : "");
       var glyph = document.createElement("span");
       glyph.className = "mini__won";
       mini.appendChild(glyph);
@@ -74,6 +98,22 @@
       frag.appendChild(mini);
     }
     boardEl.appendChild(frag);
+
+    /* files a-i along the bottom, ranks 9-1 down the side */
+    for (var f = 0; f < 9; f++) {
+      var fl = document.createElement("span");
+      fl.textContent = FILES.charAt(f);
+      filesEl.appendChild(fl);
+      var rk = document.createElement("span");
+      rk.textContent = String(9 - f);
+      ranksEl.appendChild(rk);
+    }
+    for (var i = 0; i < 9; i++) {
+      var sq = document.createElement("span");
+      sq.className = "overall__sq";
+      overallEl.appendChild(sq);
+      overall[i] = sq;
+    }
     boardEl.addEventListener("click", function (ev) {
       var btn = ev.target.closest(".cell");
       if (btn && !btn.disabled) play(+btn.dataset.move);
@@ -106,6 +146,7 @@
 
   function advance(move) {
     past.push(E.pack(state));
+    moves.push(move);
     E.apply(state, move);
     render(move);
     if (state.over) finishGame();
@@ -148,7 +189,8 @@
     var canMove = myTurn();
 
     for (var b = 0; b < 9; b++) {
-      var mini = minis[b], owner = state.bw[b], cls = "mini";
+      var mini = minis[b], owner = state.bw[b];
+      var cls = "mini" + (b % 2 === 0 ? " mini--light" : "");
       if (owner === X) cls += " mini--x";
       else if (owner === O) cls += " mini--o";
       else if (owner === E.DEAD) cls += " mini--dead";
@@ -176,10 +218,97 @@
       }
     }
 
+    renderOverall(live);
+    renderMoves();
+    renderSeats();
     boardEl.classList.toggle("is-thinking", !!cancelThinking);
     boardEl.classList.toggle("ubk--free", free && canMove);
     renderStatus(free, live);
     undoBtn.disabled = !past.length || mode === "online" || !!cancelThinking;
+  }
+
+  /* The move list, as a chess site would show it: numbered pairs, with the
+     move just played picked out. */
+  function renderMoves() {
+    if (!moves.length) {
+      movesEl.innerHTML = '<p class="moves__empty">The moves will appear here.</p>';
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < moves.length; i += 2) {
+      var no = (i / 2) + 1;
+      html += '<div class="mv"><span class="mv__no">' + no + '</span>' +
+              '<span class="mv__x' + (i === moves.length - 1 ? " mv__now" : "") + '">' +
+              notate(moves[i]) + '</span>' +
+              '<span class="mv__o' + (i + 1 === moves.length - 1 ? " mv__now" : "") + '">' +
+              (moves[i + 1] != null ? notate(moves[i + 1]) : "") + '</span></div>';
+    }
+    movesEl.innerHTML = html;
+    movesEl.scrollTop = movesEl.scrollHeight;
+  }
+
+  /* The two player strips, above and below the board. */
+  function renderSeats() {
+    var home = mode === "online" ? seat : (mode === "computer" ? mySide : X);
+    var away = home === X ? O : X;
+    fill("home", home);
+    fill("away", away);
+
+    function fill(where, side) {
+      var el = document.querySelector('[data-seat="' + where + '"]');
+      var badge = document.querySelector('[data-seat-badge="' + where + '"]');
+      var name = document.querySelector('[data-seat-name="' + where + '"]');
+      var note = document.querySelector('[data-seat-note="' + where + '"]');
+      var score = document.querySelector('[data-seat-score="' + where + '"]');
+      var mine = where === "home" && mode !== "local";
+
+      var cls = "seat seat--" + (where === "home" ? "bottom" : "top");
+      if (!state.over && state.turn === side) cls += " seat--on";
+      if (state.over && state.winner === side) cls += " seat--won";
+      el.className = cls;
+
+      badge.className = "seat__badge seat__badge--" + (side === X ? "x" : "o");
+      badge.innerHTML = MARK[side];
+
+      name.textContent = mine ? "You"
+        : mode === "computer" ? "Computer"
+        : mode === "online" ? "Your friend"
+        : SIDE[side];
+      note.textContent = mode === "local" ? (side === X ? "first" : "second")
+        : SIDE[side].toLowerCase() + (mode === "computer" && !mine ? " · " + level : "");
+      score.textContent = boardsWon(side);
+    }
+  }
+
+  function boardsWon(side) {
+    var n = 0;
+    for (var b = 0; b < 9; b++) if (state.bw[b] === side) n++;
+    return n;
+  }
+
+  /* The nine boards in miniature, and the count underneath. */
+  function renderOverall(live) {
+    var x = 0, o = 0, dead = 0, b;
+    for (b = 0; b < 9; b++) {
+      var owner = state.bw[b], cls = "overall__sq";
+      if (owner === X) { cls += " overall__sq--x"; x++; }
+      else if (owner === O) { cls += " overall__sq--o"; o++; }
+      else if (owner === E.DEAD) { cls += " overall__sq--dead"; dead++; }
+      if (!state.over && live === b) cls += " overall__sq--live";
+      if (state.winLine && state.winLine.indexOf(b) > -1) cls += " overall__sq--line";
+      overall[b].className = cls;
+      var want = (owner === X || owner === O) ? MARK[owner] : "";
+      if (overall[b].innerHTML !== want) overall[b].innerHTML = want;
+    }
+
+    var open = 9 - x - o - dead;
+    var parts = ["Crosses <b>" + x + "</b>", "Noughts <b>" + o + "</b>"];
+    if (dead) parts.push("<b>" + dead + "</b> drawn");
+    parts.push("<b>" + open + "</b> still open");
+    overallCount.innerHTML = state.over && state.winner
+      ? SIDE[state.winner] + " took <b>" + (state.winner === X ? x : o) + "</b> boards, " +
+        "three of them in a row."
+      : parts.join(" &nbsp;·&nbsp; ");
   }
 
   function label(b, sq, who, open) {
@@ -211,18 +340,8 @@
     }
     dotEl.setAttribute("data-turn", dot);
     statusTxt.textContent = text;
-    hintEl.textContent = hint();
   }
 
-  function hint() {
-    if (state.over) return "Press New game for another.";
-    if (mode === "online" && net && net.connected()) {
-      return state.turn === seat ? "You are playing " + SIDE[seat].toLowerCase() + "."
-                                 : "Waiting for your friend's move.";
-    }
-    if (mode === "computer") return "You are playing " + SIDE[mySide].toLowerCase() + ".";
-    return "Pass the device over after each move.";
-  }
 
   function renderTally() {
     $("[data-tally-x]").textContent = tally[X] || 0;
@@ -235,6 +354,7 @@
     stopThinking();
     state = E.create();
     past = [];
+    moves = [];
     counted = false;
     render();
     if (mode === "computer") computerTurn();
@@ -245,24 +365,68 @@
     if (mode === "online" || !past.length) return;
     stopThinking();
     state = E.unpack(past.pop());
+    moves.pop();
     /* in a game against the computer, step back past its reply too */
     if (mode === "computer" && state.turn !== mySide && past.length) {
       state = E.unpack(past.pop());
+      moves.pop();
     }
     counted = false;
     render();
   }
 
+  /* ---- chat ------------------------------------------------------------ */
+  /* Messages go straight down the same connection as the moves. Everything
+     written here is put on the page as text, never as markup, so a message
+     is always read as words and never as anything else. */
+  function say(kind, text) {
+    var line = document.createElement("p");
+    line.className = "chat__line chat__line--" + kind;
+    line.textContent = text;
+    var empty = chatLog.querySelector(".chat__empty");
+    if (empty) empty.remove();
+    chatLog.appendChild(line);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    while (chatLog.children.length > 200) chatLog.firstChild.remove();
+  }
+
+  function clearChat(note) {
+    chatLog.innerHTML = "";
+    var p = document.createElement("p");
+    p.className = "chat__empty";
+    p.textContent = note || "Messages you send here go straight to your friend.";
+    chatLog.appendChild(p);
+  }
+
+  function sendChat(ev) {
+    if (ev) ev.preventDefault();
+    var text = chatInput.value.trim();
+    if (!text) return;
+    if (!net || !net.connected()) { say("note", "Not connected — that one was not sent."); return; }
+    net.send({ t: "chat", text: text.slice(0, 300) });
+    say("you", text);
+    chatInput.value = "";
+    chatInput.focus();
+  }
+
+  function chatReady() {
+    var live = !!(net && net.connected());
+    chatInput.disabled = !live;
+    chatSend.disabled = !live;
+    chatInput.placeholder = live ? "Say something" : "Waiting for your friend…";
+  }
+
   /* ---- the private room ------------------------------------------------ */
   function broadcast() {
     if (!net || net.role !== "host") return;
-    net.send({ t: "sync", state: E.pack(state), seat: seat === X ? O : X, tally: tally });
+    net.send({ t: "sync", state: E.pack(state), seat: seat === X ? O : X,
+               tally: tally, moves: moves });
   }
 
   function netStatus(text, kind) {
     netStatusText = text;
     netEl.textContent = text;
-    netEl.className = "room__status" + (kind ? " room__status--" + kind : "");
+    netEl.className = "netline" + (kind ? " netline--" + kind : "");
     render();
   }
 
@@ -272,15 +436,19 @@
       open: function () {
         if (net.role === "host") { broadcast(); }
         else { net.send({ t: "hello" }); }
+        say("note", net.role === "host" ? "Your friend has joined." : "You are in the room.");
+        chatReady();
         render();
       },
       message: onMessage,
-      close: function () { render(); },
+      close: function () { say("note", "Your friend has gone."); chatReady(); render(); },
       error: function () {
         if (net && net.role === "guest" && !net.connected()) {
           setupBox.hidden = false;
           liveBox.hidden = true;
+          chatEl.hidden = true;
         }
+        chatReady();
         render();
       }
     });
@@ -288,6 +456,10 @@
   }
 
   function onMessage(msg) {
+    if (msg.t === "chat") {
+      say("them", String(msg.text || "").slice(0, 300));
+      return;
+    }
     if (net.role === "host") {
       if (msg.t === "hello") { broadcast(); return; }
       if (msg.t === "move") {
@@ -304,6 +476,7 @@
         seat = msg.seat === O ? O : X;
         state = E.unpack(msg.state);
         if (msg.tally) { tally = msg.tally; renderTally(); }
+        moves = Array.isArray(msg.moves) ? msg.moves.slice() : [];
         counted = state.over;
         past = [];
         render(state.last);
@@ -316,13 +489,18 @@
   function showRoom(code) {
     setupBox.hidden = true;
     liveBox.hidden = false;
+    chatEl.hidden = false;
     codeEl.textContent = code;
+    chatReady();
   }
 
   function leaveRoom() {
     if (net) { net.close(); net = null; }
     setupBox.hidden = false;
     liveBox.hidden = true;
+    chatEl.hidden = true;
+    clearChat();
+    chatReady();
     codeEl.textContent = "";
     netStatus("", "");
     if (location.hash) history.replaceState(null, "", location.pathname);
@@ -397,6 +575,7 @@
       if (ev.key === "Enter") { ev.preventDefault(); joinRoom(); }
     });
     $("[data-leave]").addEventListener("click", leaveRoom);
+    chatForm.addEventListener("submit", sendChat);
     $("[data-copy]").addEventListener("click", copyInvite);
     window.addEventListener("beforeunload", function () { if (net) net.close(); });
   }
@@ -432,6 +611,8 @@
   /* ---- go -------------------------------------------------------------- */
   buildBoard();
   wire();
+  clearChat();
+  chatReady();
   loadTally();
   renderTally();
 
