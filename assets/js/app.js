@@ -483,7 +483,7 @@
       if (state.winLine && state.winLine.indexOf(b) > -1) cls += " mini--won-line";
       mini.el.className = cls;
       var wantStrike = (owner === X || owner === O) && state.bl[b] >= 0
-        ? strike(state.bl[b], 7) : "";
+        ? strike(state.bl[b], 5) : "";
       if (mini.glyph.innerHTML !== wantStrike) mini.glyph.innerHTML = wantStrike;
 
       for (var sq = 0; sq < 9; sq++) {
@@ -507,7 +507,7 @@
       ? E.lineIndexOf(state.winner === X ? state.bigX : state.bigO) : -1;
     var bigCls = state.winner === X ? " is-x" : " is-o";
     boardStrike.className = "ubk__strike" + (big >= 0 ? bigCls : "");
-    boardStrike.innerHTML = big >= 0 ? strike(big, 3.2) : "";
+    boardStrike.innerHTML = big >= 0 ? strike(big, 2.4) : "";
 
     renderOverall(live, big, bigCls);
     renderMoves();
@@ -603,7 +603,7 @@
     }
 
     overallStrike.className = "overall__strike" + (big >= 0 ? bigCls : "");
-    overallStrike.innerHTML = big >= 0 ? strike(big, 5) : "";
+    overallStrike.innerHTML = big >= 0 ? strike(big, 4) : "";
 
     var open = 9 - x - o - dead;
     var parts = ["Crosses <b>" + x + "</b>", "Noughts <b>" + o + "</b>"];
