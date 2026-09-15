@@ -144,7 +144,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 /* ---- the board -------------------------------------------------------- */
 .ubk {
   position: relative; width: 100%; max-width: 33rem; aspect-ratio: 1;
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 7px;
   background: rgba(200, 162, 76, 0.38);
   border: 1px solid var(--brass-line);
   touch-action: manipulation;
@@ -153,9 +156,17 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .ubk--free { border-color: var(--brass); box-shadow: 0 0 26px rgba(200, 162, 76, .12); }
 
 .mini {
-  position: relative; display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 1px; background: rgba(200, 162, 76, 0.16);
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1px;
+  background: rgba(200, 162, 76, 0.16);
   transition: background .4s var(--ease);
+  /* A grid item will not shrink below its content by default. Without this, a
+     small board holding a mark refuses its share of the row and the whole
+     board goes rectangular. */
+  min-width: 0; min-height: 0;
 }
 .mini--live { background: rgba(200, 162, 76, 0.34); }
 .mini--live::after {
@@ -175,6 +186,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   appearance: none; border: 0; margin: 0; padding: 0;
   background: var(--bg-raise); position: relative;
   display: grid; place-items: center; cursor: pointer;
+  min-width: 0; min-height: 0;
   transition: background .25s var(--ease), opacity .4s var(--ease);
 }
 .cell:disabled { cursor: default; }
@@ -183,7 +195,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .mini--live .cell--open { background: #1f180e; }
 .mini--live .cell--open:hover { background: #33270f; }
 .cell--open:focus-visible { outline: 2px solid var(--brass); outline-offset: -3px; }
-.cell svg { width: 60%; height: 60%; overflow: visible; }
+.cell svg { width: 60%; height: 60%; aspect-ratio: 1; overflow: visible; }
 .cell--x svg { color: var(--brass); }
 .cell--o svg { color: var(--ink); }
 .cell--last::before {
@@ -204,7 +216,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 .mini__won { position: absolute; inset: 0; display: grid; place-items: center;
              pointer-events: none; z-index: 2; }
-.mini__won svg { width: 72%; height: 72%; overflow: visible; opacity: .28; }
+.mini__won svg { width: 72%; height: 72%; aspect-ratio: 1; overflow: visible; opacity: .28; }
 .mini__won .mark-path { stroke-width: 6; }
 .mini--x .mini__won svg { color: var(--brass-bright); }
 .mini--o .mini__won svg { color: var(--ink); }
