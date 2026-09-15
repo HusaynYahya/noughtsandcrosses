@@ -143,6 +143,7 @@ body {
 .seat__clock--low { color: #e0876f; border-color: #7a3b2c; }
 .seat--on .seat__clock--low { background: #4a2119; border-color: #b4553c; color: #fff; }
 .seat__clock--out { background: #4a2119; border-color: #b4553c; color: #ffd9cf; }
+.tc__note { font-size: .72rem; line-height: 1.45; color: var(--text-dim); margin: .5rem 0 0; }
 
 /* ---- the board and its coordinates ------------------------------------ */
 .board-frame {

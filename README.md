@@ -51,12 +51,20 @@ and carry on from the current position.
 
 ## The clock
 
-Optional, and off until you choose it: bullet, blitz and rapid presets, or set
-your own minutes and increment. The clock does not start until the first move,
-each move adds the increment, and taking a move back puts the clock back too.
-Run out of time and you lose the game, as at chess. In an online game the clock
-belongs to whoever opened the room, so the two sides can never disagree about
-it.
+Optional, and off until you choose it. There are two ways to keep time:
+
+**A bank of time each** — the chess way. Bullet, blitz and rapid presets, or
+your own minutes and increment. Whatever you do not spend on one move is
+yours to spend on the next.
+
+**Time for every move** — 15 seconds, 30 seconds, a minute, five minutes, or
+your own. Every turn starts with the whole allowance again, however long the
+last one took. Run out on a single move and you lose.
+
+Either way the clock does not start until the first move, taking a move back
+puts the clock back with it, and running out loses the game. In an online game
+the clock belongs to whoever opened the room, so the two sides can never
+disagree about whose flag fell.
 
 ## The computer opponent
 

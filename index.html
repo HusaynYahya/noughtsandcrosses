@@ -78,11 +78,20 @@
       <label class="lbl lbl--spaced" for="tc">Clock</label>
       <select id="tc" data-tc>
         <option value="0">No clock</option>
-        <option value="60+0">1 + 0 &nbsp;· bullet</option>
-        <option value="180+2">3 + 2 &nbsp;· blitz</option>
-        <option value="300+3">5 + 3 &nbsp;· blitz</option>
-        <option value="600+0">10 + 0 &nbsp;· rapid</option>
-        <option value="custom">Custom…</option>
+        <optgroup label="A bank of time each">
+          <option value="60+0">1 + 0 &nbsp;· bullet</option>
+          <option value="180+2">3 + 2 &nbsp;· blitz</option>
+          <option value="300+3">5 + 3 &nbsp;· blitz</option>
+          <option value="600+0">10 + 0 &nbsp;· rapid</option>
+          <option value="custom">Custom…</option>
+        </optgroup>
+        <optgroup label="Time for every move">
+          <option value="move:15">15 seconds a move</option>
+          <option value="move:30">30 seconds a move</option>
+          <option value="move:60">1 minute a move</option>
+          <option value="move:300">5 minutes a move</option>
+          <option value="move:custom">Custom…</option>
+        </optgroup>
       </select>
       <div class="row2" data-tc-custom hidden>
         <div>
@@ -90,10 +99,12 @@
           <input id="tcMin" type="number" min="0" max="180" step="1" value="5" data-tc-min />
         </div>
         <div>
-          <label class="lbl" for="tcInc">Increment, seconds</label>
+          <label class="lbl" for="tcInc" data-tc-second-label>Increment, seconds</label>
           <input id="tcInc" type="number" min="0" max="60" step="1" value="3" data-tc-inc />
         </div>
       </div>
+      <p class="tc__note" data-tc-note hidden>Every move starts with the
+        whole allowance again. Run out on one move and you lose.</p>
 
       <div data-only="computer" hidden>
         <div class="row2">

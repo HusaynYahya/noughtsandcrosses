@@ -99,6 +99,8 @@
       tcCustom  = $("[data-tc-custom]"),
       tcMin     = $("[data-tc-min]"),
       tcInc     = $("[data-tc-inc]"),
+      tcLabel2  = $("[data-tc-second-label]"),
+      tcNote    = $("[data-tc-note]"),
       ranksEl   = $("[data-ranks]"),
       filesEl   = $("[data-files]"),
       chatEl    = $("[data-chat]"),
@@ -119,7 +121,12 @@
      the time since its last reading taken off as it is drawn, so the count
      stays true even when the tab has been asleep. A player whose time runs
      out loses, as at chess. */
-  var clock = { on: false, base: 0, inc: 0, left: {}, running: 0, since: 0, flagged: 0 };
+  /* Two ways to keep time. "bank" is the chess way: a sum to spend across the
+     whole game, with an increment added after each move. "move" gives the
+     same allowance to every single turn — five minutes a move, say — and
+     starts it again each time. Run out either way and you lose. */
+  var clock = { on: false, mode: "bank", base: 0, inc: 0, perMove: 0,
+                left: {}, running: 0, since: 0, flagged: 0 };
 
   /* The analysis board. `marks` holds a verdict per move, in step with
      `moves`; `standing` is how the position stood for the player to move,
@@ -328,16 +335,20 @@
   }
 
   /* ---- the clock ------------------------------------------------------- */
-  function clockSet(baseMs, incMs) {
-    clock.base = baseMs;
-    clock.inc = incMs;
-    clock.on = baseMs > 0;
+  function clockSet(tc) {
+    clock.mode = tc.mode;
+    clock.base = tc.base;
+    clock.inc = tc.inc;
+    clock.perMove = tc.perMove;
+    clock.on = tc.mode === "move" ? tc.perMove > 0 : tc.base > 0;
     clockReset();
   }
 
+  function allowance() { return clock.mode === "move" ? clock.perMove : clock.base; }
+
   function clockReset() {
-    clock.left[X] = clock.base;
-    clock.left[O] = clock.base;
+    clock.left[X] = allowance();
+    clock.left[O] = allowance();
     clock.running = 0;
     clock.since = 0;
     clock.flagged = 0;
@@ -354,7 +365,13 @@
   function clockAfterMove(mover) {
     if (!clock.on || state.over) { clock.running = 0; return; }
     clockSettle();
-    clock.left[mover] += clock.inc;
+    if (clock.mode === "move") {
+      /* both sides start their next turn with the whole allowance */
+      clock.left[mover] = clock.perMove;
+      clock.left[state.turn] = clock.perMove;
+    } else {
+      clock.left[mover] += clock.inc;
+    }
     clock.running = state.turn;
     clock.since = Date.now();
   }
@@ -415,20 +432,33 @@
   /* what the controls are asking for, in milliseconds */
   function readTimeControl() {
     var v = tcSel.value;
-    tcCustom.hidden = v !== "custom";
-    if (v === "0") return [0, 0];
-    if (v === "custom") {
-      var mins = Math.max(0, Math.min(180, +tcMin.value || 0));
-      var inc = Math.max(0, Math.min(60, +tcInc.value || 0));
-      return [mins * 60000, inc * 1000];
+    var perMove = v.indexOf("move:") === 0;
+    var custom = v === "custom" || v === "move:custom";
+
+    tcCustom.hidden = !custom;
+    tcNote.hidden = !perMove;
+    tcLabel2.textContent = perMove ? "and seconds" : "Increment, seconds";
+
+    if (v === "0") return { mode: "bank", base: 0, inc: 0, perMove: 0 };
+
+    var mins = Math.max(0, Math.min(180, +tcMin.value || 0));
+    var secs = Math.max(0, Math.min(60, +tcInc.value || 0));
+
+    if (perMove) {
+      var each = v === "move:custom"
+        ? mins * 60000 + secs * 1000
+        : (+v.slice(5) || 0) * 1000;
+      return { mode: "move", base: 0, inc: 0, perMove: each };
     }
+    if (custom) return { mode: "bank", base: mins * 60000, inc: secs * 1000, perMove: 0 };
+
     var parts = v.split("+");
-    return [(+parts[0] || 0) * 1000, (+parts[1] || 0) * 1000];
+    return { mode: "bank", base: (+parts[0] || 0) * 1000,
+             inc: (+parts[1] || 0) * 1000, perMove: 0 };
   }
 
   function applyTimeControl() {
-    var tc = readTimeControl();
-    clockSet(tc[0], tc[1]);
+    clockSet(readTimeControl());
     reset(mode === "online" && net && net.role === "host");
   }
 
@@ -600,7 +630,8 @@
       text = !state.winner
         ? "A drawn game — every square filled, nobody with three boards in a row."
         : clock.flagged
-          ? SIDE[state.winner] + " win — " + SIDE[clock.flagged].toLowerCase() + " ran out of time."
+          ? SIDE[state.winner] + " win — " + SIDE[clock.flagged].toLowerCase() +
+            (clock.mode === "move" ? " ran out of time on that move." : " ran out of time.")
           : SIDE[state.winner] + " win — three boards in a row.";
     } else if (mode === "online" && (!net || !net.connected())) {
       text = netStatusText || "Not connected yet.";
@@ -710,7 +741,8 @@
     clockSettle();
     net.send({ t: "sync", state: E.pack(state), seat: seat === X ? O : X,
                tally: tally, moves: moves,
-               clock: { on: clock.on, base: clock.base, inc: clock.inc,
+               clock: { on: clock.on, mode: clock.mode, base: clock.base,
+                        inc: clock.inc, perMove: clock.perMove,
                         x: clock.left[X], o: clock.left[O], running: clock.running } });
   }
 
@@ -770,8 +802,10 @@
         moves = Array.isArray(msg.moves) ? msg.moves.slice() : [];
         if (msg.clock) {
           clock.on = !!msg.clock.on;
+          clock.mode = msg.clock.mode === "move" ? "move" : "bank";
           clock.base = msg.clock.base | 0;
           clock.inc = msg.clock.inc | 0;
+          clock.perMove = msg.clock.perMove | 0;
           clock.left[X] = msg.clock.x | 0;
           clock.left[O] = msg.clock.o | 0;
           clock.running = msg.clock.running | 0;
@@ -923,7 +957,7 @@
   clearChat();
   chatReady();
   renderAnalysis();
-  clockSet.apply(null, readTimeControl());
+  clockSet(readTimeControl());
   setInterval(clockTick, 100);
   loadTally();
   renderTally();
