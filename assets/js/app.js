@@ -302,7 +302,10 @@
 
   function renderAnalysis() {
     anBody.hidden = !analysis.on;
-    anState.textContent = analysis.on ? (analysis.busy ? "…" : "on") : "off";
+    anState.textContent = !analysis.on
+      ? "Off — switch on for the engine's view"
+      : analysis.busy ? "Reading the position…"
+      : "On — best move, chances and the likely line";
     if (!analysis.on) return;
 
     var r = analysis.report;

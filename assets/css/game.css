@@ -332,12 +332,27 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .mv__now { background: var(--go-dim); box-shadow: inset 2px 0 0 var(--go); }
 
 /* ---- the analysis board ----------------------------------------------- */
-.an__head { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
-.an__head .lbl { margin: 0; flex: 1 1 auto; }
-.an__head input { width: auto; flex: none; accent-color: var(--go); cursor: pointer; }
-.an__state { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em;
-             color: var(--text-dim); min-width: 2rem; text-align: right; }
-.an__head input:checked ~ .an__state { color: var(--go-hi); }
+/* a switch you cannot miss */
+.switch { display: flex; align-items: center; gap: .7rem; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.switch__track {
+  flex: none; position: relative; width: 2.6rem; height: 1.4rem;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 1rem;
+  transition: background .25s var(--ease), border-color .25s var(--ease);
+}
+.switch__knob {
+  position: absolute; top: 50%; left: .16rem; transform: translateY(-50%);
+  width: .95rem; height: .95rem; border-radius: 50%;
+  background: var(--text-dim);
+  transition: left .25s var(--ease), background .25s var(--ease);
+}
+.switch input:checked + .switch__track { background: var(--go-dim); border-color: var(--go); }
+.switch input:checked + .switch__track .switch__knob { left: 1.35rem; background: var(--go-hi); }
+.switch input:focus-visible + .switch__track { outline: 2px solid var(--go-hi); outline-offset: 2px; }
+.switch__text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.switch__text b { color: var(--text-strong); font-size: .85rem; font-weight: 600; }
+.switch__text small { color: var(--text-dim); font-size: .72rem; }
+.switch:hover .switch__text b { color: #fff; }
 
 /* how the game stands, as a bar: crosses from the left, noughts from the right */
 .evalbar {

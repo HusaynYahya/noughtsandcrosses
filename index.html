@@ -6,7 +6,7 @@
 <meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
 <meta name="theme-color" content="#161512" />
 <title>Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/game.css?v=7" />
+<link rel="stylesheet" href="assets/css/game.css?v=8" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body>
@@ -148,10 +148,13 @@
     </div>
 
     <div class="side__block analysis">
-      <label class="an__head">
-        <span class="lbl">Analysis board</span>
+      <label class="switch">
         <input type="checkbox" data-an-toggle />
-        <span class="an__state" data-an-state>off</span>
+        <span class="switch__track"><span class="switch__knob"></span></span>
+        <span class="switch__text">
+          <b>Analysis board</b>
+          <small data-an-state>Off — switch on for the engine's view</small>
+        </span>
       </label>
       <div data-an-body hidden>
         <div class="evalbar" data-eval-bar>
@@ -233,10 +236,10 @@
   </aside>
 </main>
 
-<script src="assets/js/engine.js?v=7"></script>
-<script src="assets/js/ai.js?v=7"></script>
-<script src="assets/js/analysis.js?v=7"></script>
-<script src="assets/js/net.js?v=7"></script>
-<script src="assets/js/app.js?v=7" defer></script>
+<script src="assets/js/engine.js?v=8"></script>
+<script src="assets/js/ai.js?v=8"></script>
+<script src="assets/js/analysis.js?v=8"></script>
+<script src="assets/js/net.js?v=8"></script>
+<script src="assets/js/app.js?v=8" defer></script>
 </body>
 </html>
