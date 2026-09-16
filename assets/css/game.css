@@ -258,6 +258,21 @@ body {
 .explore__head b { color: var(--text-strong); }
 .explore__head span { color: var(--text); }
 .mv__var { font-style: italic; opacity: .85; }
+
+/* the line the engine expects, playable a move at a time */
+.engine-line { margin: 0 0 .7rem; padding-top: .6rem; border-top: 1px solid var(--line); }
+.engine-line .lbl { margin-bottom: .3rem; }
+.engine-line__moves { margin: 0 0 .5rem; display: flex; flex-wrap: wrap; gap: .3rem; }
+.engine-line__moves button {
+  font: inherit; font-family: var(--mono); font-size: .8rem;
+  background: var(--bg-2); color: var(--text-strong);
+  border: 1px solid var(--line); padding: .2rem .45rem; cursor: pointer;
+  transition: background .18s var(--ease), border-color .18s var(--ease);
+}
+.engine-line__moves button:hover { background: var(--go-dim); border-color: var(--go); }
+.engine-line__moves button:first-child { border-color: var(--go-hi); }
+.engine-line__moves .waiting { color: var(--text-dim); font-family: var(--font); font-size: .78rem; }
+.btn--slim { padding: .4rem .7rem; font-size: .72rem; }
 .mv--var { background: rgba(155, 199, 0, .07); box-shadow: inset 2px 0 0 var(--live-hi); }
 
 /* ---- status ----------------------------------------------------------- */
@@ -343,6 +358,40 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .mv__x { color: var(--x); }
 .mv__o { color: var(--o); }
 .mv__now { background: var(--go-dim); box-shadow: inset 2px 0 0 var(--go); }
+
+/* ---- going back over the game ----------------------------------------- */
+.review__intro { font-size: .78rem; line-height: 1.45; color: var(--text-dim); margin: 0 0 .6rem; }
+.review__progress { font-size: .76rem; color: var(--go-hi); margin: .6rem 0 0; }
+.review__summary { font-size: .78rem; line-height: 1.6; color: var(--text-dim);
+                   margin: .6rem 0 0; }
+.review__summary b { color: var(--text-strong); font-weight: 600; }
+
+/* how the game stood, move by move */
+.evalgraph { margin: .7rem 0 .2rem; cursor: pointer; background: var(--bg-2);
+             border: 1px solid var(--line); }
+.evalgraph svg { display: block; width: 100%; height: 66px; }
+.eg__area { fill: rgba(236, 234, 231, .10); stroke: none; }
+.eg__line { fill: none; stroke: var(--x); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.eg__mid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.eg__now { stroke: var(--go-hi); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.eg__mark--dubious { fill: #d2b53c; }
+.eg__mark--mistake { fill: #e08c3f; }
+.eg__mark--blunder { fill: #e0603f; }
+
+/* stepping through */
+.moves-nav { display: flex; align-items: center; gap: .3rem; padding: .4rem;
+             border-top: 1px solid var(--line); }
+.navb {
+  font: inherit; font-size: .78rem; flex: 1 1 auto;
+  background: var(--panel-2); color: var(--text-strong);
+  border: 1px solid var(--line); padding: .3rem 0; cursor: pointer;
+}
+.navb:hover:not(:disabled) { background: #3a3733; }
+.navb:disabled { opacity: .35; cursor: default; }
+.moves-nav__at { font-family: var(--mono); font-size: .76rem; color: var(--text-dim);
+                 padding: 0 .3rem; min-width: 4.2rem; text-align: center; }
+.mv__x[data-at], .mv__o[data-at] { cursor: pointer; }
+.mv__x[data-at]:hover, .mv__o[data-at]:hover { background: rgba(255,255,255,.06); }
 
 /* ---- the analysis board ----------------------------------------------- */
 /* a switch you cannot miss */

@@ -6,7 +6,7 @@
 <meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
 <meta name="theme-color" content="#161512" />
 <title>Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/game.css?v=13" />
+<link rel="stylesheet" href="assets/css/game.css?v=14" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body>
@@ -149,15 +149,17 @@
       </div>
     </div>
 
-    <div class="side__block analysis">
-      <label class="switch">
-        <input type="checkbox" data-an-toggle />
-        <span class="switch__track"><span class="switch__knob"></span></span>
-        <span class="switch__text">
-          <b>Analysis board</b>
-          <small data-an-state>Off — switch on for the engine's view</small>
-        </span>
-      </label>
+    <div class="side__block review" data-review hidden>
+      <span class="lbl" data-review-title>The game is over</span>
+      <p class="review__intro" data-review-intro>Step through the moves below, or
+        have the engine go over the whole game.</p>
+      <div class="row-btn">
+        <button class="btn btn--go" type="button" data-review-analyse>Analyse the game</button>
+      </div>
+      <p class="review__progress" data-review-progress hidden></p>
+      <div class="evalgraph" data-evalgraph hidden></div>
+      <p class="review__summary" data-review-summary hidden></p>
+
       <div data-an-body hidden>
         <div class="evalbar" data-eval-bar>
           <span class="evalbar__x" data-eval-fill style="width:50%"></span>
@@ -179,6 +181,13 @@
       <div class="moves" data-moves role="log" aria-label="Moves played">
         <p class="moves__empty">The moves will appear here.</p>
       </div>
+      <div class="moves-nav" data-moves-nav hidden>
+        <button class="navb" type="button" data-nav="start" aria-label="First move">|◀</button>
+        <button class="navb" type="button" data-nav="prev" aria-label="Previous move">◀</button>
+        <span class="moves-nav__at" data-nav-label>0 / 0</span>
+        <button class="navb" type="button" data-nav="next" aria-label="Next move">▶</button>
+        <button class="navb" type="button" data-nav="end" aria-label="Last move">▶|</button>
+      </div>
     </div>
 
     <div class="side__block">
@@ -196,6 +205,15 @@
           <span data-explore-count>Nothing played yet.</span>
           Play moves for either side; none of it counts until you commit one.
         </p>
+        <div class="engine-line" data-engine-line hidden>
+          <span class="lbl">The engine expects</span>
+          <p class="engine-line__moves" data-engine-moves></p>
+          <div class="row-btn">
+            <button class="btn btn--slim" type="button" data-engine-step>Next move</button>
+            <button class="btn btn--slim" type="button" data-engine-all>Play the line</button>
+          </div>
+        </div>
+
         <div class="row-btn">
           <button class="btn btn--go" type="button" data-explore-commit disabled>Play it</button>
           <button class="btn" type="button" data-explore-back disabled>Back</button>
@@ -257,12 +275,12 @@
   </aside>
 </main>
 
-<script src="assets/js/engine.js?v=13"></script>
-<script src="assets/js/features.js?v=13"></script>
-<script src="assets/js/weights.js?v=13"></script>
-<script src="assets/js/ai.js?v=13"></script>
-<script src="assets/js/analysis.js?v=13"></script>
-<script src="assets/js/net.js?v=13"></script>
-<script src="assets/js/app.js?v=13" defer></script>
+<script src="assets/js/engine.js?v=14"></script>
+<script src="assets/js/features.js?v=14"></script>
+<script src="assets/js/weights.js?v=14"></script>
+<script src="assets/js/ai.js?v=14"></script>
+<script src="assets/js/analysis.js?v=14"></script>
+<script src="assets/js/net.js?v=14"></script>
+<script src="assets/js/app.js?v=14" defer></script>
 </body>
 </html>

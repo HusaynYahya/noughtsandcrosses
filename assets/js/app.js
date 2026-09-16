@@ -86,9 +86,16 @@
       joinInput = $("[data-join-code]"),
       overallEl = $("[data-overall]"),
       movesEl   = $("[data-moves]"),
-      anToggle  = $("[data-an-toggle]"),
-      anState   = $("[data-an-state]"),
       anBody    = $("[data-an-body]"),
+      reviewBox   = $("[data-review]"),
+      reviewTitle = $("[data-review-title]"),
+      reviewIntro = $("[data-review-intro]"),
+      reviewGoBtn = $("[data-review-analyse]"),
+      reviewProg  = $("[data-review-progress]"),
+      reviewSum   = $("[data-review-summary]"),
+      evalGraph   = $("[data-evalgraph]"),
+      movesNav    = $("[data-moves-nav]"),
+      navLabel    = $("[data-nav-label]"),
       anBest    = $("[data-an-best]"),
       anPv      = $("[data-an-pv]"),
       anCands   = $("[data-an-cands]"),
@@ -100,6 +107,10 @@
       exploreBox   = $("[data-explore-controls]"),
       exploreCount = $("[data-explore-count]"),
       exploreFlag  = $("[data-explore-flag]"),
+      engineLine   = $("[data-engine-line]"),
+      engineMoves  = $("[data-engine-moves]"),
+      engineStep   = $("[data-engine-step]"),
+      engineAll    = $("[data-engine-all]"),
       commitBtn    = $("[data-explore-commit]"),
       backBtn      = $("[data-explore-back]"),
       doneBtn      = $("[data-explore-done]"),
@@ -148,6 +159,11 @@
      this browser until a move is committed, and anything arriving from the
      other player waits until you are finished. */
   var explore = { on: false, base: null, baseMoves: [], baseTurn: X, from: 0 };
+
+  /* Going back over a finished game. `at` is how many moves are on the board;
+     the full record stays in `moves` so the list can show all of it. The
+     engine is only ever consulted here — never while a game is being played. */
+  var review = { on: false, at: 0, full: null, scores: [], done: false, running: false };
 
   function buildBoard() {
     var frag = document.createDocumentFragment();
@@ -204,6 +220,7 @@
   function myTurn() {
     if (state.over) return false;
     if (explore.on) return true;          /* either side, on the scratchpad */
+    if (review.on) return false;          /* the game is over: this is a look back */
     if (mode === "computer") return state.turn === mySide && !cancelThinking;
     if (mode === "online") return net && net.connected() && state.turn === seat;
     return true;
@@ -246,6 +263,7 @@
   function finishGame() {
     if (counted) return;
     counted = true;
+    setTimeout(reviewEnter, 900);          /* let the result land first */
     tally[state.winner] = (tally[state.winner] || 0) + 1;
     saveTally();
     renderTally();
@@ -271,6 +289,168 @@
 
   function stopThinking() {
     if (cancelThinking) { cancelThinking(); cancelThinking = null; }
+  }
+
+  /* ---- going back over the game ---------------------------------------- */
+  function positionAt(n) {
+    var s = E.create();
+    for (var i = 0; i < n && i < moves.length; i++) E.apply(s, moves[i]);
+    return s;
+  }
+
+  function reviewEnter() {
+    if (review.on || !state.over) return;
+    review.on = true;
+    review.full = E.pack(state);
+    review.at = moves.length;
+    render();
+  }
+
+  function reviewLeave() {
+    if (!review.on) return;
+    if (explore.on) exploreLeave(null);
+    review.on = false;
+    review.done = false;
+    review.scores = [];
+    review.running = false;
+    analysis.report = null;
+    state = E.unpack(review.full);
+    render();
+  }
+
+  function reviewGo(n) {
+    if (!review.on) return;
+    if (explore.on) exploreLeave(null);
+    review.at = Math.max(0, Math.min(moves.length, n));
+    state = positionAt(review.at);
+    render();
+    analysisRun();
+  }
+
+  /* Read every position of the game in turn, then judge each move by what it
+     did to the position: how it stood for the mover before, against how it
+     stands for them after. The same comparison a chess site makes. */
+  function reviewAnalyse() {
+    if (!review.on || review.running) return;
+    review.running = true;
+    review.scores = new Array(moves.length + 1);
+    analysis.marks = [];
+    var at = 0;
+    renderReview();
+
+    step();
+    function step() {
+      if (!review.on) { review.running = false; return; }
+      reviewProg.hidden = false;
+      reviewProg.textContent = "Looking at move " + Math.min(at + 1, moves.length) +
+        " of " + moves.length + "…";
+      var pos = positionAt(at);
+      AN.analyse(pos, 300, function (r) {
+        /* always from the crosses' side, so the numbers can be compared */
+        review.scores[at] = r.turn === O ? 100 - r.score : r.score;
+        at++;
+        if (at <= moves.length) { setTimeout(step, 0); return; }
+        finish();
+      });
+    }
+
+    function finish() {
+      for (var i = 0; i < moves.length; i++) {
+        var mover = i % 2 === 0 ? X : O;
+        var before = mover === X ? review.scores[i] : 100 - review.scores[i];
+        var after = mover === X ? review.scores[i + 1] : 100 - review.scores[i + 1];
+        var verdict = AN.judge(before, after, true);
+        if (verdict) analysis.marks[i] = verdict;
+      }
+      review.running = false;
+      review.done = true;
+      reviewProg.hidden = true;
+      render();
+      analysisRun();
+    }
+  }
+
+  function renderReview() {
+    var over = state.over || review.on;
+    reviewBox.hidden = !(review.on || (state.over && moves.length));
+    movesNav.hidden = !review.on;
+
+    if (!reviewBox.hidden) {
+      reviewTitle.textContent = review.on ? "Going back over the game" : "The game is over";
+      reviewIntro.textContent = review.on
+        ? "Step through with the arrows under the moves, or click any move in the list."
+        : "Step through the moves, or have the engine go over the whole game.";
+      reviewGoBtn.disabled = review.running;
+      reviewGoBtn.textContent = review.running ? "Reading…"
+        : review.done ? "Look again" : "Analyse the game";
+    }
+    if (review.on) {
+      navLabel.textContent = review.at + " / " + moves.length;
+      movesNav.querySelector('[data-nav="start"]').disabled = review.at === 0;
+      movesNav.querySelector('[data-nav="prev"]').disabled = review.at === 0;
+      movesNav.querySelector('[data-nav="next"]').disabled = review.at >= moves.length;
+      movesNav.querySelector('[data-nav="end"]').disabled = review.at >= moves.length;
+    }
+    renderSummary();
+    renderGraph();
+  }
+
+  function renderSummary() {
+    var counts = { X: { "?!": 0, "?": 0, "??": 0 }, O: { "?!": 0, "?": 0, "??": 0 } };
+    var any = false;
+    analysis.marks.forEach(function (v, i) {
+      if (!v) return;
+      any = true;
+      counts[i % 2 === 0 ? "X" : "O"][v.mark]++;
+    });
+    reviewSum.hidden = !any;
+    if (!any) return;
+    function line(side, c) {
+      var bits = [];
+      if (c["?!"]) bits.push(c["?!"] + " inaccura" + (c["?!"] > 1 ? "cies" : "cy"));
+      if (c["?"]) bits.push(c["?"] + " mistake" + (c["?"] > 1 ? "s" : ""));
+      if (c["??"]) bits.push(c["??"] + " blunder" + (c["??"] > 1 ? "s" : ""));
+      return "<b>" + side + "</b> " + (bits.length ? bits.join(", ") : "nothing to answer for");
+    }
+    reviewSum.innerHTML = line("Crosses", counts.X) + "<br>" + line("Noughts", counts.O);
+  }
+
+  /* how the game stood, move by move — click it to jump */
+  function renderGraph() {
+    var scores = review.scores;
+    if (!review.on || !review.done || !scores || scores.length < 2) {
+      evalGraph.hidden = true;
+      return;
+    }
+    evalGraph.hidden = false;
+    var W = 280, H = 66;
+    var x = function (i) { return (W - 2) * i / (scores.length - 1) + 1; };
+    var y = function (v) { return H - (H - 4) * (v / 100) - 2; };
+    var area = "M" + x(0) + " " + H, i;
+    for (i = 0; i < scores.length; i++) area += " L" + x(i).toFixed(1) + " " + y(scores[i]).toFixed(1);
+    area += " L" + x(scores.length - 1) + " " + H + " Z";
+    var line = scores.map(function (v, k) {
+      return (k ? "L" : "M") + x(k).toFixed(1) + " " + y(v).toFixed(1);
+    }).join(" ");
+
+    var marks = "";
+    analysis.marks.forEach(function (v, k) {
+      if (!v) return;
+      var kind = v.mark === "??" ? "blunder" : v.mark === "?" ? "mistake" : "dubious";
+      marks += '<circle class="eg__mark eg__mark--' + kind + '" cx="' + x(k + 1).toFixed(1) +
+               '" cy="' + y(scores[k + 1]).toFixed(1) + '" r="2.6"></circle>';
+    });
+
+    evalGraph.innerHTML =
+      '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" ' +
+      'aria-label="How the game stood, move by move">' +
+        '<line class="eg__mid" x1="0" y1="' + (H / 2) + '" x2="' + W + '" y2="' + (H / 2) + '"/>' +
+        '<path class="eg__area" d="' + area + '"/>' +
+        '<path class="eg__line" d="' + line + '"/>' +
+        marks +
+        '<line class="eg__now" x1="' + x(review.at).toFixed(1) + '" y1="0" x2="' +
+          x(review.at).toFixed(1) + '" y2="' + H + '"/>' +
+      "</svg>";
   }
 
   /* ---- trying a line --------------------------------------------------- */
@@ -338,11 +518,47 @@
     return true;
   }
 
+  /* The line the engine expects from the position now on the board. Each move
+     can be clicked to play the line as far as that move. */
+  function renderEngineLine() {
+    if (!explore.on) { engineLine.hidden = true; return; }
+    engineLine.hidden = false;
+    var r = analysis.report;
+    var pv = r && !state.over ? r.pv : [];
+
+    if (!pv.length) {
+      engineMoves.innerHTML = '<span class="waiting">' +
+        (state.over ? "The line ends here." : "Reading the position…") + "</span>";
+      engineStep.disabled = engineAll.disabled = true;
+      return;
+    }
+    engineMoves.innerHTML = pv.map(function (m, i) {
+      return '<button type="button" data-line="' + i + '" title="Play the line to here">' +
+             notate(m) + "</button>";
+    }).join("");
+    engineStep.disabled = engineAll.disabled = false;
+  }
+
+  /* play the engine's line up to and including move `upto` */
+  function playEngineLine(upto) {
+    if (!explore.on || !analysis.report) return;
+    var pv = analysis.report.pv || [];
+    for (var i = 0; i <= upto && i < pv.length; i++) {
+      if (state.over || !E.isLegal(state, pv[i])) break;
+      moves.push(pv[i]);
+      E.apply(state, pv[i]);
+    }
+    render(state.last);
+    analysisRun();
+  }
+
   function renderExplore() {
     var n = moves.length - explore.from;
     exploreStart.hidden = explore.on;
     exploreBox.hidden = !explore.on;
     playControls.hidden = explore.on;
+    undoBtn.hidden = review.on;
+    exploreBtn.textContent = review.on ? "Try a line from here…" : "Try a line…";
     exploreFlag.hidden = !explore.on;
     boardEl.classList.toggle("ubk--exploring", explore.on);
     exploreBtn.disabled = state.over || (mode === "online" && !(net && net.connected()));
@@ -352,6 +568,7 @@
       : n === 1 ? "One move in: " + notate(moves[explore.from]) + "."
       : n + " moves in, starting " + notate(moves[explore.from]) + ".";
     backBtn.disabled = n === 0;
+    renderEngineLine();
     commitBtn.disabled = !exploreCanCommit();
     commitBtn.textContent = n ? "Play " + notate(moves[explore.from]) : "Play it";
   }
@@ -362,7 +579,9 @@
      readings can be set side by side and the move judged. */
   function analysisRun() {
     if (analysis.cancel) { analysis.cancel(); analysis.cancel = null; }
-    if (!analysis.on) { analysis.busy = false; renderAnalysis(); return; }
+    /* The engine is only ever consulted once a game is over — never while one
+       is being played, whether against the computer or a friend. */
+    if (!review.on) { analysis.busy = false; renderAnalysis(); return; }
     analysis.busy = true;
     renderAnalysis();
     var forState = E.clone(state);
@@ -373,27 +592,13 @@
       if (forState.filled !== state.filled || forState.turn !== state.turn) return;
       analysis.report = report;
 
-      if (analysis.pending) {
-        var p = analysis.pending;
-        analysis.pending = null;
-        var mine = 100 - report.score;          /* from the mover's side */
-        var verdict = AN.judge(p.before, mine, true);
-        if (verdict) analysis.marks[p.index] = verdict;
-        renderMoves();
-      }
-      analysis.standing = report.score;
       render();
     });
   }
 
   /* called as a move is played, so the move can be judged once the new
      position has been read */
-  function analysisNote(index) {
-    if (explore.on) { analysis.standing = null; return; }
-    if (!analysis.on || analysis.standing == null) { analysis.standing = null; return; }
-    analysis.pending = { index: index, before: analysis.standing };
-    analysis.standing = null;
-  }
+  function analysisNote() { analysis.standing = null; }
 
   function analysisReset() {
     if (analysis.cancel) { analysis.cancel(); analysis.cancel = null; }
@@ -405,12 +610,8 @@
   }
 
   function renderAnalysis() {
-    anBody.hidden = !analysis.on;
-    anState.textContent = !analysis.on
-      ? "Off — switch on for the engine's view"
-      : analysis.busy ? "Reading the position…"
-      : "On — best move, chances and the likely line";
-    if (!analysis.on) return;
+    anBody.hidden = !review.on;
+    if (!review.on) return;
 
     var r = analysis.report;
     anBody.classList.toggle("an__thinking", analysis.busy && !r);
@@ -576,7 +777,7 @@
   /* ---- drawing --------------------------------------------------------- */
   function render(justPlayed) {
     var live = E.activeBoard(state);
-    var bestSquare = analysis.on && analysis.report && !state.over
+    var bestSquare = review.on && analysis.report && !state.over
       ? analysis.report.best : -1;
     var free = live < 0 && !state.over;
     var canMove = myTurn();
@@ -624,6 +825,7 @@
     renderMoves();
     renderSeats();
     renderExplore();
+    renderReview();
     renderClocks();
     renderAnalysis();
     boardEl.classList.toggle("is-thinking", !!cancelThinking);
@@ -643,12 +845,14 @@
     for (var i = 0; i < moves.length; i += 2) {
       var no = (i / 2) + 1;
       var isVar = explore.on && i >= explore.from;
+      var here = review.on ? review.at - 1 : moves.length - 1;
       html += '<div class="mv' + (isVar ? " mv--var" : "") + '"><span class="mv__no">' + no + '</span>' +
-              '<span class="mv__x' + (i === moves.length - 1 ? " mv__now" : "") +
-              (isVar ? " mv__var" : "") + '">' +
+              '<span class="mv__x' + (i === here ? " mv__now" : "") +
+              (isVar ? " mv__var" : "") + '"' + (review.on ? ' data-at="' + (i + 1) + '"' : "") + '>' +
               notate(moves[i]) + markup(i) + '</span>' +
-              '<span class="mv__o' + (i + 1 === moves.length - 1 ? " mv__now" : "") +
-              (explore.on && i + 1 >= explore.from ? " mv__var" : "") + '">' +
+              '<span class="mv__o' + (i + 1 === here ? " mv__now" : "") +
+              (explore.on && i + 1 >= explore.from ? " mv__var" : "") + '"' +
+              (review.on && moves[i + 1] != null ? ' data-at="' + (i + 2) + '"' : "") + '>' +
               (moves[i + 1] != null ? notate(moves[i + 1]) + markup(i + 1) : "") + '</span></div>';
     }
 
@@ -660,7 +864,18 @@
              v.name + ", " + v.loss + ' points given away">' + v.mark + '</span>';
     }
     movesEl.innerHTML = html;
-    movesEl.scrollTop = movesEl.scrollHeight;
+    if (review.on) {
+      var now = movesEl.querySelector(".mv__now");
+      if (now) {
+        /* measured against the list itself: offsetTop would be relative to
+           whichever ancestor happens to be positioned */
+        var row = now.parentNode.getBoundingClientRect();
+        var box = movesEl.getBoundingClientRect();
+        movesEl.scrollTop += (row.top - box.top) - (movesEl.clientHeight - row.height) / 2;
+      } else movesEl.scrollTop = 0;
+    } else {
+      movesEl.scrollTop = movesEl.scrollHeight;
+    }
   }
 
   /* The two player strips, above and below the board. */
@@ -776,6 +991,8 @@
   function reset(broadcastIt) {
     stopThinking();
     if (explore.on) explore.on = false;
+    if (review.on) { review.on = false; review.done = false; review.scores = []; }
+    analysis.marks = [];
     state = E.create();
     past = [];
     moves = [];
@@ -1034,18 +1251,43 @@
     backBtn.addEventListener("click", exploreBack);
     commitBtn.addEventListener("click", exploreCommit);
     doneBtn.addEventListener("click", function () { exploreLeave(null); });
+    engineStep.addEventListener("click", function () { playEngineLine(0); });
+    engineAll.addEventListener("click", function () { playEngineLine(99); });
+    engineMoves.addEventListener("click", function (ev) {
+      var btn = ev.target.closest("[data-line]");
+      if (btn) playEngineLine(+btn.getAttribute("data-line"));
+    });
     document.addEventListener("keydown", function (ev) {
+      var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName);
+      if (review.on && !explore.on && !typing) {
+        if (ev.key === "ArrowLeft") { ev.preventDefault(); reviewGo(review.at - 1); return; }
+        if (ev.key === "ArrowRight") { ev.preventDefault(); reviewGo(review.at + 1); return; }
+        if (ev.key === "Home") { ev.preventDefault(); reviewGo(0); return; }
+        if (ev.key === "End") { ev.preventDefault(); reviewGo(moves.length); return; }
+      }
       if (ev.key === "Escape" && explore.on) { exploreLeave(null); }
       if (ev.key === "Backspace" && explore.on && ev.target === document.body) {
         ev.preventDefault();
         exploreBack();
       }
     });
-    anToggle.addEventListener("change", function () {
-      analysis.on = anToggle.checked;
-      if (!analysis.on) analysisReset();
-      render();                       /* clears the marked square too */
-      if (analysis.on) analysisRun();
+    reviewGoBtn.addEventListener("click", reviewAnalyse);
+    evalGraph.addEventListener("click", function (ev) {
+      if (!review.on || !review.scores.length) return;
+      var box = evalGraph.getBoundingClientRect();
+      var at = Math.round((ev.clientX - box.left) / box.width * moves.length);
+      reviewGo(at);
+    });
+    movesNav.addEventListener("click", function (ev) {
+      var btn = ev.target.closest("[data-nav]");
+      if (!btn) return;
+      var where = btn.getAttribute("data-nav");
+      reviewGo(where === "start" ? 0 : where === "end" ? moves.length
+             : where === "prev" ? review.at - 1 : review.at + 1);
+    });
+    movesEl.addEventListener("click", function (ev) {
+      var cell = ev.target.closest("[data-at]");
+      if (cell && review.on) reviewGo(+cell.getAttribute("data-at"));
     });
     tcSel.addEventListener("change", applyTimeControl);
     tcMin.addEventListener("change", applyTimeControl);

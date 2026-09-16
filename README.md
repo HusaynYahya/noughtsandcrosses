@@ -108,31 +108,24 @@ standing on a position that no longer exists.
 With the analysis board switched on, it reads each position in the line as you
 play it, so you can see what the engine makes of where you are heading.
 
-## The analysis board
+## Going back over a finished game
 
-Switch it on and the search reads the position after every move and says three
-things:
+The engine keeps out of the way while you are playing. Nothing it thinks is
+shown during a game — against the computer, against a friend, or across the
+table — so there is nothing to lean on and nothing to accuse anybody of.
 
-- **How it stands** — a bar, and a number: the chance each side ends up
-  winning, as the search found it.
-- **What to play** — the move it would choose, ringed on the board, with the
-  next best alternatives and what each is worth.
-- **How it goes on** — the line it expects: the move it examined most, then
-  that move's most-examined reply, and on down.
+When the game ends, the review opens. Step through the moves with the arrows,
+the left and right arrow keys, or by clicking any move in the list; the board
+follows. At each position the engine says how it stood, what it would have
+played, and the line it expected. **Try a line from here** branches off into
+your own variation, with the engine's suggestion beside it to play out a move
+at a time or all at once.
 
-It also marks the moves already played. A move is judged the way a chess site
-judges one: how the position stood for you before you moved, against how it
-stands for you after. Give ground and the move is marked **?!** for an
-inaccuracy, **?** for a mistake, **??** for a blunder — and a move that ends a
-game which was still alive is called a blunder whatever the arithmetic says,
-because that is the moment worth pointing at.
-
-The two readings come from separate searches, so a point or two of noise is
-expected; the thresholds are set well clear of it. It is a search, not an
-oracle: on a fresh position it is reading a few thousand playouts, and it will
-sometimes change its mind.
-
-Best left switched off while you are playing somebody.
+**Analyse the game** goes over every position in turn and marks the moves:
+**?!** an inaccuracy, **?** a mistake, **??** a blunder, judged by what the
+move did to the position rather than by whether it was the engine's choice.
+Underneath, a graph of how the game stood move by move, with the mistakes
+marked on it — click anywhere on it to jump there.
 
 ## Running it
 
