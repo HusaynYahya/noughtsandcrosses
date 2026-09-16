@@ -85,8 +85,11 @@ Nine generations were trained and five were kept. Every number those runs
 produced — the matches, the fitting curves, the self-play results and all 24
 weights of every generation — is charted on the
 [progress page](https://husaynyahya.github.io/noughtsandcrosses/progress.html).
-How it was done is written up in [PAPER.md](PAPER.md); to run the training
-again, see [train/](train/).
+
+How it was done is written up in
+**[the report](https://husaynyahya.github.io/noughtsandcrosses/paper.html)** —
+the same text as [PAPER.md](PAPER.md), as a page you can actually read in a
+browser. To run the training again, see [train/](train/).
 
 ## The analysis board
 

@@ -27,4 +27,6 @@ against its parent, and `train/weights/history.json` records the run.
 The games themselves land in `train/data/` and are not committed — they are
 several megabytes a generation and can be made again at any time.
 
-See [PAPER.md](../PAPER.md) for what the model is and how it works.
+See [PAPER.md](../PAPER.md) for what the model is and how it works — or
+[read it as a page](https://husaynyahya.github.io/noughtsandcrosses/paper.html).
+After editing the markdown, rebuild that page with `node tools/build-paper.js`.
