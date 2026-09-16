@@ -1,0 +1,29 @@
+[
+  {
+    "generation": 1,
+    "score": 67.5,
+    "kept": true,
+    "heldOutLossBefore": 1.5625,
+    "heldOutLossAfter": 1.5338,
+    "agreementBefore": 43,
+    "agreementAfter": 48.6
+  },
+  {
+    "generation": 2,
+    "score": 51.67,
+    "kept": false,
+    "heldOutLossBefore": 1.531,
+    "heldOutLossAfter": 1.5191,
+    "agreementBefore": 50.5,
+    "agreementAfter": 51.2
+  },
+  {
+    "generation": 3,
+    "score": 57.5,
+    "kept": true,
+    "heldOutLossBefore": 1.553,
+    "heldOutLossAfter": 1.5395,
+    "agreementBefore": 47.7,
+    "agreementAfter": 48.6
+  }
+]

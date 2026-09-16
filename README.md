@@ -68,11 +68,20 @@ disagree about whose flag fell.
 
 ## The computer opponent
 
-Three levels — gentle, steady and ruthless. It uses Monte-Carlo tree search:
-it plays out thousands of random games from the position in front of it and
-keeps the moves that tend to end well. It thinks in short slices so the page
-never freezes, and it is given between 0.4 and 2.2 seconds depending on the
-level.
+Three levels — gentle, steady and ruthless. It plays by Monte-Carlo tree
+search: from the position in front of it, it plays out thousands of fast games
+to the end and keeps the moves that tend to end well. On top of that sit a
+solver, which proves outright wins and losses instead of sampling them, and a
+learned policy that decides which moves are worth the first playouts. It
+thinks in short slices so the page never freezes.
+
+The policy's weights were learned from the engine's own games: the engine
+plays itself, the search's own choices are the teaching signal, and each
+generation is kept only if it beats the one before it over a match. That
+learning is worth about 68% against the hand-written priors it replaced, and
+the engine as it stands takes 89% against the plain search it started as.
+How it was done is written up in [PAPER.md](PAPER.md); to run the training
+again, see [train/](train/).
 
 ## The analysis board
 

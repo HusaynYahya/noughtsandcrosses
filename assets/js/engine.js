@@ -46,6 +46,9 @@
   var EMPTIES = new Array(512);
   /* COUNT[mask] — how many squares are taken. */
   var COUNT = new Uint8Array(512);
+  /* COMPLETES[mask] — which single squares would finish a line, as a mask.
+     Answers "could they win here in one?" without looking at eight lines. */
+  var COMPLETES = new Uint16Array(512);
   (function build() {
     for (var m = 0; m < 512; m++) {
       var i, hit = 0, free = [], n = 0;
@@ -54,6 +57,16 @@
       for (i = 0; i < 9; i++) { if (m & (1 << i)) n++; else free.push(i); }
       EMPTIES[m] = free;
       COUNT[m] = n;
+      var fills = 0;
+      for (i = 0; i < 9; i++) {
+        if (!(m & (1 << i))) {
+          for (var j = 0; j < 8; j++) {
+            var l = LINE_MASKS[j];
+            if (((m | (1 << i)) & l) === l) { fills |= (1 << i); break; }
+          }
+        }
+      }
+      COMPLETES[m] = fills;
     }
   })();
 
@@ -218,7 +231,7 @@
   root.UNC.engine = {
     EMPTY: EMPTY, X: X, O: O, DEAD: DEAD, FULL: FULL,
     LINES: LINES, LINE_MASKS: LINE_MASKS,
-    WIN: WIN, EMPTIES: EMPTIES, COUNT: COUNT,
+    WIN: WIN, EMPTIES: EMPTIES, COUNT: COUNT, COMPLETES: COMPLETES,
     create: create, clone: clone, copyInto: copyInto,
     at: at, occ: occ, isFull: isFull, activeBoard: activeBoard,
     legalMoves: legalMoves, isLegal: isLegal, apply: apply,

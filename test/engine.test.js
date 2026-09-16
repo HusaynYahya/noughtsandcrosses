@@ -5,7 +5,7 @@ function load(f) {
   var code = fs.readFileSync(path.join(__dirname, "..", "assets/js", f), "utf8");
   new Function("globalThis", "window", code)(g, undefined);
 }
-load("engine.js"); load("ai.js");
+load("engine.js"); load("features.js"); load("weights.js"); load("ai.js");
 var E = g.UNC.engine, AI = g.UNC.ai;
 
 var fails = 0, checks = 0;
