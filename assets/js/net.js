@@ -17,7 +17,11 @@
 (function (root) {
   "use strict";
 
-  var PEERJS_SRC = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
+  /* The library is kept in this repository and served from the same place as
+     the game, so a blocked or unreachable CDN cannot stop a room opening. The
+     CDN is only there in case the local copy is somehow missing. */
+  var PEERJS_SRC = "assets/vendor/peerjs-1.5.4.min.js";
+  var PEERJS_FALLBACK = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
   var PREFIX = "unc-v1-";        /* keeps our room codes clear of other apps */
 
   /* Words chosen to be easy to read out over the phone. */
@@ -60,21 +64,29 @@
   function loadPeer() {
     if (root.Peer) return Promise.resolve(root.Peer);
     if (loading) return loading;
-    loading = new Promise(function (resolve, reject) {
+    loading = fetchScript(PEERJS_SRC).catch(function () {
+      return fetchScript(PEERJS_FALLBACK);
+    }).catch(function (err) {
+      loading = null;
+      throw err;
+    });
+    return loading;
+  }
+
+  function fetchScript(src) {
+    return new Promise(function (resolve, reject) {
       var s = document.createElement("script");
-      s.src = PEERJS_SRC;
+      s.src = src;
       s.async = true;
       s.onload = function () {
         root.Peer ? resolve(root.Peer)
-                  : reject(new Error("The connection library did not load."));
+                  : reject(new Error("The connection library loaded but was empty."));
       };
       s.onerror = function () {
-        loading = null;
-        reject(new Error("Could not reach the connection library. Check your internet."));
+        reject(new Error("Could not load the connection library from " + src + "."));
       };
       document.head.appendChild(s);
     });
-    return loading;
   }
 
   /* ---- a session ------------------------------------------------------- */
@@ -257,6 +269,101 @@
     return api;
   }
 
+  /* ---- when it will not connect ---------------------------------------- */
+  /* Three things have to work for a private room: the connection library has
+     to load, the public matchmaking service has to answer, and this network
+     has to let two browsers reach each other directly. This checks them one at
+     a time and says which one is the trouble, rather than leaving somebody
+     staring at "still knocking". */
+  function diagnose(onStep) {
+    var results = [];
+    function note(name, ok, detail) {
+      results.push({ name: name, ok: ok, detail: detail });
+      if (onStep) onStep(results.slice(), false);
+      return results;
+    }
+
+    var libOk = false;
+    return loadPeer().then(function () {
+      libOk = true;
+      note("The connection library", true, "loaded");
+    }, function (err) {
+      note("The connection library", false, err.message);
+    }).then(function () {
+      /* no point asking the matchmaking service anything without it */
+      return libOk ? broker() : null;
+    }).then(function () {
+      return reachable();               /* this one stands on its own */
+    }).then(function () {
+      if (onStep) onStep(results.slice(), true);
+      return results;
+    }, function () {
+      if (onStep) onStep(results.slice(), true);
+      return results;
+    });
+
+    /* does the matchmaking service answer, and give us an address? */
+    function broker() {
+      return new Promise(function (done) {
+        var peer, settled = false;
+        var timer = setTimeout(function () { finish(false, "no answer within 12 seconds"); }, 12000);
+        try { peer = new root.Peer({ debug: 0 }); }
+        catch (e) { finish(false, e.message); return; }
+        peer.on("open", function (id) { finish(true, "answered, and called this browser " + id); });
+        peer.on("error", function (err) {
+          finish(false, (err && err.type ? err.type : "failed") +
+            (err && err.message ? " — " + err.message : ""));
+        });
+        function finish(ok, detail) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          try { peer && peer.destroy(); } catch (e) {}
+          note("The matchmaking service", ok, ok ? detail :
+            detail + ". It is a free public service and does go down; if the rest " +
+            "passes, waiting a while is usually all it takes.");
+          done();
+        }
+      });
+    }
+
+    /* can this network see itself from the outside? without that, two
+       browsers behind different routers cannot meet */
+    function reachable() {
+      return new Promise(function (done) {
+        var RTC = root.RTCPeerConnection || root.webkitRTCPeerConnection;
+        if (!RTC) { note("This browser's connection support", false, "WebRTC is not available"); done(); return; }
+        var pc, settled = false, found = false;
+        try {
+          pc = new RTC({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+          pc.createDataChannel("probe");
+        } catch (e) { finish("could not start: " + e.message); return; }
+
+        var timer = setTimeout(function () { finish(null); }, 8000);
+        pc.onicecandidate = function (ev) {
+          if (!ev.candidate) { finish(null); return; }
+          if (ev.candidate.type === "srflx" ||
+              /typ srflx/.test(ev.candidate.candidate || "")) { found = true; finish(null); }
+        };
+        pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
+          .catch(function (e) { finish("could not start: " + e.message); });
+
+        function finish(why) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          try { pc && pc.close(); } catch (e) {}
+          note("This network", found, why ? why : found
+            ? "lets this browser be reached from outside"
+            : "did not let this browser find its own address from outside. Some " +
+              "office and mobile networks block that, and a direct connection " +
+              "cannot be made through them.");
+          done();
+        }
+      });
+    }
+  }
+
   root.UNC = root.UNC || {};
-  root.UNC.net = { session: session, makeCode: makeCode, tidyCode: tidyCode };
+  root.UNC.net = { session: session, makeCode: makeCode, tidyCode: tidyCode, diagnose: diagnose };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -41,9 +41,18 @@ nobody keeps the advantage of going first.
 
 There is no server behind the game and no account to make. The two browsers talk
 to each other directly over WebRTC, so the moves never pass through anybody's
-database, and nothing is stored when you close the tab. A public signalling
-broker introduces the two browsers to each other — it sees the room code and
+database, and nothing is stored when you close the tab. A public matchmaking
+service introduces the two browsers to each other — it sees the room code and
 nothing else. Both players need the page open at the same time.
+
+The connection library is kept in this repository and served alongside the
+game, so a blocked or unreachable CDN cannot stop a room opening.
+
+**If a room will not open**, there is a *Check the connection* link under the
+room controls. It tries the three things a private game needs — the library,
+the matchmaking service, and whether this network lets two browsers reach each
+other — and says which one is the trouble. The third is the one no code can fix:
+some office and mobile networks will not allow a direct connection at all.
 
 If your friend's phone drops off the network mid-game, the page says so within
 about fifteen seconds. The room stays open: they can rejoin with the same code

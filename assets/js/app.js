@@ -115,6 +115,8 @@
       backBtn      = $("[data-explore-back]"),
       doneBtn      = $("[data-explore-done]"),
       playControls = $("[data-play-controls]"),
+      netCheckBtn = $("[data-net-check]"),
+      netCheckOut = $("[data-net-check-out]"),
       tcSel     = $("[data-tc]"),
       tcCustom  = $("[data-tc-custom]"),
       tcMin     = $("[data-tc-min]"),
@@ -1205,6 +1207,30 @@
     }).catch(function () { /* likewise */ });
   }
 
+  /* ---- when a room will not open --------------------------------------- */
+  function runNetCheck() {
+    netCheckBtn.disabled = true;
+    netCheckBtn.textContent = "Checking…";
+    netCheckOut.hidden = false;
+    netCheckOut.innerHTML = '<li class="working">Trying the three things a room needs…</li>';
+
+    NET.diagnose(function (steps, finished) {
+      netCheckOut.innerHTML = steps.map(function (s) {
+        return '<li class="' + (s.ok ? "ok" : "bad") + '"><b>' + s.name + "</b> — " +
+               s.detail + "</li>";
+      }).join("") + (finished ? "" : '<li class="working">still checking…</li>');
+      if (!finished) return;
+      netCheckBtn.disabled = false;
+      netCheckBtn.textContent = "Check again";
+      var bad = steps.filter(function (s) { return !s.ok; });
+      if (!bad.length) {
+        netCheckOut.innerHTML += '<li class="ok"><b>All three are fine</b> — so a room ' +
+          'should open. If it still does not, your friend may be the one having trouble: ' +
+          'ask them to run this too.</li>';
+      }
+    });
+  }
+
   /* ---- keeping the tally between visits -------------------------------- */
   function saveTally() {
     try { localStorage.setItem("unc.tally", JSON.stringify(tally)); } catch (e) {}
@@ -1298,6 +1324,7 @@
       if (ev.key === "Enter") { ev.preventDefault(); joinRoom(); }
     });
     $("[data-leave]").addEventListener("click", leaveRoom);
+    netCheckBtn.addEventListener("click", runNetCheck);
     chatForm.addEventListener("submit", sendChat);
     $("[data-copy]").addEventListener("click", copyInvite);
     window.addEventListener("beforeunload", function () { if (net) net.close(); });

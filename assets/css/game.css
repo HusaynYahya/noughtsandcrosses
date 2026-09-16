@@ -343,6 +343,15 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .netline { font-size: .76rem; line-height: 1.45; color: var(--text-dim); margin: .55rem 0 0; }
 .netline--live { color: var(--go-hi); }
 .netline--error { color: #e0876f; }
+.linkish { background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+           color: var(--go-hi); text-decoration: underline; }
+.netcheck { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .74rem; line-height: 1.45; }
+.netcheck li { padding: .3rem 0 .3rem 1.1rem; position: relative; color: var(--text-dim); }
+.netcheck li::before { position: absolute; left: 0; top: .3rem; }
+.netcheck .ok::before { content: "✓"; color: var(--go-hi); }
+.netcheck .bad::before { content: "✕"; color: #e0876f; }
+.netcheck b { color: var(--text-strong); font-weight: 600; }
+.netcheck .working::before { content: "…"; }
 
 /* ---- move list -------------------------------------------------------- */
 .moves {
