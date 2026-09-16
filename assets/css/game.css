@@ -97,7 +97,7 @@ body {
   grid-template-columns: 1.15rem minmax(0, 1fr);
   gap: .5rem .25rem;
 }
-.board-col > .seat, .board-col > .status { grid-column: 2; }
+.board-col > .seat, .board-col > .status, .board-col > .explore-flag { grid-column: 2; }
 
 /* ---- player strips ---------------------------------------------------- */
 .seat {
@@ -246,6 +246,19 @@ body {
   stroke-dasharray: 160; stroke-dashoffset: 160;
 }
 @keyframes rule-through { to { stroke-dashoffset: 0; } }
+
+/* ---- trying a line ---------------------------------------------------- */
+.explore-flag {
+  margin: 0; padding: .3rem .6rem;
+  background: rgba(155, 199, 0, .12); border: 1px dashed var(--live-hi);
+  color: #cfe08a; font-size: .74rem; letter-spacing: .04em; text-align: center;
+}
+.ubk--exploring { box-shadow: 0 0 0 2px var(--live-hi), 0 0 24px rgba(155, 199, 0, .16); }
+.explore__head { font-size: .76rem; line-height: 1.45; color: var(--text-dim); margin: 0 0 .6rem; }
+.explore__head b { color: var(--text-strong); }
+.explore__head span { color: var(--text); }
+.mv__var { font-style: italic; opacity: .85; }
+.mv--var { background: rgba(155, 199, 0, .07); box-shadow: inset 2px 0 0 var(--live-hi); }
 
 /* ---- status ----------------------------------------------------------- */
 .status {

@@ -95,6 +95,15 @@
       anSide    = $("[data-an-side]"),
       anEvalBar = $("[data-eval-fill]"),
       anEvalTxt = $("[data-eval-text]"),
+      exploreBtn   = $("[data-explore]"),
+      exploreStart = $("[data-explore-start]"),
+      exploreBox   = $("[data-explore-controls]"),
+      exploreCount = $("[data-explore-count]"),
+      exploreFlag  = $("[data-explore-flag]"),
+      commitBtn    = $("[data-explore-commit]"),
+      backBtn      = $("[data-explore-back]"),
+      doneBtn      = $("[data-explore-done]"),
+      playControls = $("[data-play-controls]"),
       tcSel     = $("[data-tc]"),
       tcCustom  = $("[data-tc-custom]"),
       tcMin     = $("[data-tc-min]"),
@@ -133,6 +142,12 @@
      kept so the next move can be judged against it. */
   var analysis = { on: false, cancel: null, report: null, marks: [],
                    standing: null, pending: null, busy: false };
+
+  /* Trying a line. The real game is put aside, and the board becomes a
+     scratchpad you can push moves around on for either side. Nothing leaves
+     this browser until a move is committed, and anything arriving from the
+     other player waits until you are finished. */
+  var explore = { on: false, base: null, baseMoves: [], baseTurn: X, from: 0 };
 
   function buildBoard() {
     var frag = document.createDocumentFragment();
@@ -188,12 +203,17 @@
   /* ---- whose move is it ------------------------------------------------ */
   function myTurn() {
     if (state.over) return false;
+    if (explore.on) return true;          /* either side, on the scratchpad */
     if (mode === "computer") return state.turn === mySide && !cancelThinking;
     if (mode === "online") return net && net.connected() && state.turn === seat;
     return true;
   }
 
   function play(move) {
+    if (explore.on) {
+      if (!state.over && E.isLegal(state, move)) exploreMove(move);
+      return;
+    }
     if (!myTurn() || !E.isLegal(state, move)) return;
     if (clock.on && !clock.running) { clock.running = state.turn; clock.since = Date.now(); }
 
@@ -253,6 +273,89 @@
     if (cancelThinking) { cancelThinking(); cancelThinking = null; }
   }
 
+  /* ---- trying a line --------------------------------------------------- */
+  function exploreEnter() {
+    if (explore.on || state.over) return;
+    stopThinking();
+    explore.on = true;
+    explore.base = E.pack(state);
+    explore.baseMoves = moves.slice();
+    explore.baseTurn = state.turn;
+    explore.from = moves.length;
+    render();
+    analysisRun();
+  }
+
+  /* put the real game back; `keep` is a move to play for real afterwards */
+  function exploreLeave(keep) {
+    if (!explore.on) return;
+    state = E.unpack(explore.base);
+    moves = explore.baseMoves.slice();
+    explore.on = false;
+    analysis.marks.length = moves.length;
+    analysis.standing = null;
+    analysis.pending = null;
+    render();
+
+    /* anything the other player sent while we were away */
+    if (keep != null && E.isLegal(state, keep)) { play(keep); return; }
+    analysisRun();
+    /* thinking was stopped on the way in; set it going again */
+    if (mode === "computer" && !state.over && state.turn !== mySide) computerTurn();
+  }
+
+  function exploreBack() {
+    if (!explore.on || moves.length <= explore.from) return;
+    var replay = moves.slice(explore.from, moves.length - 1);
+    state = E.unpack(explore.base);
+    moves = explore.baseMoves.slice();
+    replay.forEach(function (m) { moves.push(m); E.apply(state, m); });
+    render();
+    analysisRun();
+  }
+
+  function exploreCommit() {
+    if (!explore.on || moves.length <= explore.from) return;
+    exploreLeave(moves[explore.from]);
+  }
+
+  /* a move played while trying a line: either side, no clock, nothing sent */
+  function exploreMove(move) {
+    moves.push(move);
+    E.apply(state, move);
+    render(move);
+    analysisRun();
+  }
+
+  /* could the first move of this line actually be played now? */
+  function exploreCanCommit() {
+    if (!explore.on || moves.length <= explore.from) return false;
+    var first = moves[explore.from];
+    var real = E.unpack(explore.base);
+    if (!E.isLegal(real, first)) return false;
+    if (mode === "computer") return explore.baseTurn === mySide && !cancelThinking;
+    if (mode === "online") return !!(net && net.connected()) && explore.baseTurn === seat;
+    return true;
+  }
+
+  function renderExplore() {
+    var n = moves.length - explore.from;
+    exploreStart.hidden = explore.on;
+    exploreBox.hidden = !explore.on;
+    playControls.hidden = explore.on;
+    exploreFlag.hidden = !explore.on;
+    boardEl.classList.toggle("ubk--exploring", explore.on);
+    exploreBtn.disabled = state.over || (mode === "online" && !(net && net.connected()));
+    if (!explore.on) return;
+
+    exploreCount.textContent = n === 0 ? "Nothing played yet."
+      : n === 1 ? "One move in: " + notate(moves[explore.from]) + "."
+      : n + " moves in, starting " + notate(moves[explore.from]) + ".";
+    backBtn.disabled = n === 0;
+    commitBtn.disabled = !exploreCanCommit();
+    commitBtn.textContent = n ? "Play " + notate(moves[explore.from]) : "Play it";
+  }
+
   /* ---- the analysis board ---------------------------------------------- */
   /* Every time the position changes, look at it again. The reading for the
      position before a move is kept, so when that move is played the two
@@ -286,6 +389,7 @@
   /* called as a move is played, so the move can be judged once the new
      position has been read */
   function analysisNote(index) {
+    if (explore.on) { analysis.standing = null; return; }
     if (!analysis.on || analysis.standing == null) { analysis.standing = null; return; }
     analysis.pending = { index: index, before: analysis.standing };
     analysis.standing = null;
@@ -388,7 +492,11 @@
   function clockTick() {
     if (!clock.on) return;
     clockSettle();
-    if (clock.running && clock.left[clock.running] <= 0 && !state.over && mayFlag()) {
+    if (clock.running && clock.left[clock.running] <= 0 && mayFlag() &&
+        (explore.on || !state.over)) {
+      /* the real game is what runs out, not the line being tried */
+      if (explore.on) exploreLeave(null);
+      if (state.over) { renderClocks(); return; }
       var loser = clock.running;
       clock.flagged = loser;
       clock.running = 0;
@@ -515,6 +623,7 @@
     renderOverall(live, big, bigCls);
     renderMoves();
     renderSeats();
+    renderExplore();
     renderClocks();
     renderAnalysis();
     boardEl.classList.toggle("is-thinking", !!cancelThinking);
@@ -533,10 +642,13 @@
     var html = "";
     for (var i = 0; i < moves.length; i += 2) {
       var no = (i / 2) + 1;
-      html += '<div class="mv"><span class="mv__no">' + no + '</span>' +
-              '<span class="mv__x' + (i === moves.length - 1 ? " mv__now" : "") + '">' +
+      var isVar = explore.on && i >= explore.from;
+      html += '<div class="mv' + (isVar ? " mv--var" : "") + '"><span class="mv__no">' + no + '</span>' +
+              '<span class="mv__x' + (i === moves.length - 1 ? " mv__now" : "") +
+              (isVar ? " mv__var" : "") + '">' +
               notate(moves[i]) + markup(i) + '</span>' +
-              '<span class="mv__o' + (i + 1 === moves.length - 1 ? " mv__now" : "") + '">' +
+              '<span class="mv__o' + (i + 1 === moves.length - 1 ? " mv__now" : "") +
+              (explore.on && i + 1 >= explore.from ? " mv__var" : "") + '">' +
               (moves[i + 1] != null ? notate(moves[i + 1]) + markup(i + 1) : "") + '</span></div>';
     }
 
@@ -641,7 +753,8 @@
     } else if (cancelThinking) {
       text = "The computer is thinking…";
     } else {
-      var who = myTurn() && mode !== "local" ? "Your move" : SIDE[state.turn] + " to play";
+      var who = explore.on ? SIDE[state.turn] + " to play in this line"
+        : myTurn() && mode !== "local" ? "Your move" : SIDE[state.turn] + " to play";
       text = who + " — " + (free ? "anywhere you like."
                                  : "the " + BOARDS[live] + " board.");
       if (!free && state.bw[live] && state.bw[live] !== E.DEAD) {
@@ -662,6 +775,7 @@
   /* ---- new game -------------------------------------------------------- */
   function reset(broadcastIt) {
     stopThinking();
+    if (explore.on) explore.on = false;
     state = E.create();
     past = [];
     moves = [];
@@ -782,6 +896,12 @@
   }
 
   function onMessage(msg) {
+    /* Anything that moves the real game on ends the line being tried — better
+       than leaving a scratchpad standing on a position that no longer is. */
+    if (explore.on && (msg.t === "sync" || msg.t === "move" || msg.t === "rematch")) {
+      exploreLeave(null);
+      say("note", "Your friend moved, so the line you were trying is gone.");
+    }
     if (msg.t === "chat") {
       say("them", String(msg.text || "").slice(0, 300));
       return;
@@ -798,27 +918,31 @@
       }
       if (msg.t === "rematch") { swapSides(); reset(); return; }
     } else {
-      if (msg.t === "sync") {
-        seat = msg.seat === O ? O : X;
-        state = E.unpack(msg.state);
-        if (msg.tally) { tally = msg.tally; renderTally(); }
-        moves = Array.isArray(msg.moves) ? msg.moves.slice() : [];
-        if (msg.clock) {
-          clock.on = !!msg.clock.on;
-          clock.mode = msg.clock.mode === "move" ? "move" : "bank";
-          clock.base = msg.clock.base | 0;
-          clock.inc = msg.clock.inc | 0;
-          clock.perMove = msg.clock.perMove | 0;
-          clock.left[X] = msg.clock.x | 0;
-          clock.left[O] = msg.clock.o | 0;
-          clock.running = msg.clock.running | 0;
-          clock.since = Date.now();
-        }
-        counted = state.over;
-        past = [];
-        render(state.last);
-      }
+      if (msg.t === "sync") applySync(msg);
     }
+  }
+
+  function applySync(msg) {
+    seat = msg.seat === O ? O : X;
+    state = E.unpack(msg.state);
+    if (msg.tally) { tally = msg.tally; renderTally(); }
+    moves = Array.isArray(msg.moves) ? msg.moves.slice() : [];
+    if (msg.clock) {
+      clock.on = !!msg.clock.on;
+      clock.mode = msg.clock.mode === "move" ? "move" : "bank";
+      clock.base = msg.clock.base | 0;
+      clock.inc = msg.clock.inc | 0;
+      clock.perMove = msg.clock.perMove | 0;
+      clock.left[X] = msg.clock.x | 0;
+      clock.left[O] = msg.clock.o | 0;
+      clock.running = msg.clock.running | 0;
+      clock.since = Date.now();
+    }
+    counted = state.over;
+    past = [];
+    analysis.marks.length = moves.length;
+    render(state.last);
+    analysisRun();
   }
 
   function swapSides() { seat = seat === X ? O : X; }
@@ -906,6 +1030,17 @@
       reset(false);
     });
     undoBtn.addEventListener("click", undo);
+    exploreBtn.addEventListener("click", exploreEnter);
+    backBtn.addEventListener("click", exploreBack);
+    commitBtn.addEventListener("click", exploreCommit);
+    doneBtn.addEventListener("click", function () { exploreLeave(null); });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && explore.on) { exploreLeave(null); }
+      if (ev.key === "Backspace" && explore.on && ev.target === document.body) {
+        ev.preventDefault();
+        exploreBack();
+      }
+    });
     anToggle.addEventListener("change", function () {
       analysis.on = anToggle.checked;
       if (!analysis.on) analysisReset();

@@ -6,7 +6,7 @@
 <meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
 <meta name="theme-color" content="#161512" />
 <title>Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/game.css?v=12" />
+<link rel="stylesheet" href="assets/css/game.css?v=13" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body>
@@ -40,6 +40,8 @@
       <span class="seat__score" data-seat-score="away" title="Small boards won">0</span>
       <span class="seat__clock" data-seat-clock="away" hidden>5:00</span>
     </div>
+
+    <p class="explore-flag" data-explore-flag hidden>Trying a line — nothing here has been played</p>
 
     <div class="board-frame">
       <div class="ranks" data-ranks aria-hidden="true"></div>
@@ -180,9 +182,25 @@
     </div>
 
     <div class="side__block">
-      <div class="row-btn">
+      <div class="row-btn" data-play-controls>
         <button class="btn btn--go" type="button" data-new>New game</button>
         <button class="btn" type="button" data-undo>Take back</button>
+      </div>
+      <div class="row-btn" data-explore-start>
+        <button class="btn" type="button" data-explore>Try a line…</button>
+      </div>
+
+      <div data-explore-controls hidden>
+        <p class="explore__head">
+          <b>Trying a line.</b>
+          <span data-explore-count>Nothing played yet.</span>
+          Play moves for either side; none of it counts until you commit one.
+        </p>
+        <div class="row-btn">
+          <button class="btn btn--go" type="button" data-explore-commit disabled>Play it</button>
+          <button class="btn" type="button" data-explore-back disabled>Back</button>
+          <button class="btn" type="button" data-explore-done>Done</button>
+        </div>
       </div>
     </div>
 
@@ -239,12 +257,12 @@
   </aside>
 </main>
 
-<script src="assets/js/engine.js?v=12"></script>
-<script src="assets/js/features.js?v=12"></script>
-<script src="assets/js/weights.js?v=12"></script>
-<script src="assets/js/ai.js?v=12"></script>
-<script src="assets/js/analysis.js?v=12"></script>
-<script src="assets/js/net.js?v=12"></script>
-<script src="assets/js/app.js?v=12" defer></script>
+<script src="assets/js/engine.js?v=13"></script>
+<script src="assets/js/features.js?v=13"></script>
+<script src="assets/js/weights.js?v=13"></script>
+<script src="assets/js/ai.js?v=13"></script>
+<script src="assets/js/analysis.js?v=13"></script>
+<script src="assets/js/net.js?v=13"></script>
+<script src="assets/js/app.js?v=13" defer></script>
 </body>
 </html>

@@ -91,6 +91,23 @@ How it was done is written up in
 the same text as [PAPER.md](PAPER.md), as a page you can actually read in a
 browser. To run the training again, see [train/](train/).
 
+## Trying a line before you commit
+
+**Try a line…** turns the board into a scratchpad. Play moves for both sides,
+as far ahead as you like, and see how it would go; a banner and a green frame
+make sure you never mistake it for the real game. **Back** takes one move off,
+**Done** puts the position back exactly as it was, and **Play it** plays the
+first move of your line for real.
+
+Nothing is sent anywhere while you are trying a line: the computer does not
+reply to it, and an online opponent sees none of it. Your clock keeps running,
+because you are still thinking. If your opponent moves while you are mid-line,
+the line is dropped and you are told why — better than leaving a scratchpad
+standing on a position that no longer exists.
+
+With the analysis board switched on, it reads each position in the line as you
+play it, so you can see what the engine makes of where you are heading.
+
 ## The analysis board
 
 Switch it on and the search reads the position after every move and says three
