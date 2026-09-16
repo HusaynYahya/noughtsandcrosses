@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="How the ultimate noughts and crosses engine learned: every generation, every fitting curve, every weight." />
+<meta name="theme-color" content="#161512" />
+<title>How the engine learned</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #161512;
+    --surface-1: #1c1a17;
+    --surface-2: #232120;
+    --line: #3f3c38;
+    --grid: rgba(255,255,255,.07);
+    --text-primary: #e9e7e4;
+    --text-secondary: #b6b3ae;
+    --text-muted: #8a8681;
+
+    /* categorical — validated (dark, surface #1c1a17, all pairs) */
+    --series-1: #3987e5;   /* crosses */
+    --series-2: #d95926;   /* noughts */
+    --series-3: #199e70;   /* drawn   */
+
+    /* sequential blue, oldest → newest generation (ordinal floor: no darker than 600) */
+    --seq-1: #cde2fb; --seq-2: #b7d3f6; --seq-3: #9ec5f4; --seq-4: #86b6ef;
+    --seq-5: #6da7ec; --seq-6: #5598e7; --seq-7: #3987e5; --seq-8: #2a78d6;
+    --seq-9: #256abf; --seq-10: #1c5cab;
+
+    /* diverging blue ↔ red about a neutral grey */
+    --div-pos-3: #2a78d6; --div-pos-2: #5598e7; --div-pos-1: #9ec5f4;
+    --div-mid: #383835;
+    --div-neg-1: #f3b0b0; --div-neg-2: #e66767; --div-neg-3: #d03b3b;
+
+    --good: #0ca30c;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text-secondary);
+    font-family: var(--font); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1060px; margin-inline: auto; padding: clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 1.5rem) 4rem; }
+  header.top { background: var(--surface-1); border-bottom: 1px solid var(--line); }
+  .top__in { max-width: 1060px; margin-inline: auto; padding: .7rem clamp(1rem, 3vw, 1.5rem);
+             display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
+  .top a { color: var(--text-secondary); text-decoration: none; font-size: .85rem; }
+  .top a:hover { color: var(--text-primary); }
+  .brand { color: var(--text-primary); font-weight: 600; font-size: .92rem; }
+
+  h1 { color: var(--text-primary); font-size: clamp(1.6rem, 4vw, 2.3rem); line-height: 1.15;
+       margin: 1.4rem 0 .5rem; font-weight: 600; }
+  .lede { max-width: 62ch; margin: 0 0 1.6rem; }
+  h2 { color: var(--text-primary); font-size: 1.05rem; font-weight: 600; margin: 0 0 .2rem; }
+  .sub { font-size: .82rem; color: var(--text-muted); margin: 0 0 .9rem; max-width: 70ch; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .7rem; margin-bottom: 2rem; }
+  .kpi { background: var(--surface-1); border: 1px solid var(--line); padding: .8rem .9rem; }
+  .kpi__n { font-family: var(--mono); font-size: 1.75rem; color: var(--text-primary); line-height: 1.1; }
+  .kpi__l { font-size: .74rem; color: var(--text-muted); margin-top: .25rem; }
+
+  .card { background: var(--surface-1); border: 1px solid var(--line); padding: 1rem 1rem .6rem; margin-bottom: 1.1rem; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+  @media (max-width: 760px) { .row2 { grid-template-columns: 1fr; } }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .grid line { stroke: var(--grid); stroke-width: 1; }
+  .axis text { fill: var(--text-muted); font-size: 10px; font-family: var(--mono); }
+  .axis line { stroke: var(--line); }
+  .lbl { fill: var(--text-secondary); font-size: 10px; font-family: var(--mono); }
+  .lbl--on { fill: var(--text-primary); }
+  .legend { display: flex; flex-wrap: wrap; gap: .8rem; font-size: .76rem; color: var(--text-secondary);
+            margin: .55rem 0 .2rem; }
+  .legend i { width: .7rem; height: .7rem; display: inline-block; margin-right: .32rem;
+              vertical-align: -1px; border-radius: 2px; }
+  .ramp { display: flex; align-items: center; gap: .35rem; font-size: .74rem; color: var(--text-muted); }
+  .ramp span { width: .85rem; height: .7rem; border-radius: 2px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .78rem; font-family: var(--mono); }
+  caption { text-align: left; font-family: var(--font); color: var(--text-muted);
+            font-size: .82rem; padding-bottom: .5rem; }
+  th, td { padding: .35rem .5rem; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th { color: var(--text-muted); font-weight: 500; font-size: .72rem; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  tr.kept td { color: var(--text-primary); }
+  tr.dropped td { color: var(--text-muted); }
+  .scroll { overflow-x: auto; }
+  .tag { font-family: var(--font); font-size: .68rem; padding: .05rem .35rem; border-radius: 2px;
+         border: 1px solid var(--line); }
+  .tag--kept { color: #8fd48f; border-color: #2f5c2f; }
+  .tag--drop { color: var(--text-muted); }
+
+  .tip { position: fixed; pointer-events: none; opacity: 0; transition: opacity .12s;
+         background: #0e0d0b; border: 1px solid var(--line); padding: .45rem .6rem;
+         font-size: .76rem; color: var(--text-primary); z-index: 10; max-width: 260px; }
+  .tip b { font-family: var(--mono); }
+  .foot { font-size: .78rem; color: var(--text-muted); margin-top: 2rem; }
+  .foot a { color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top__in">
+    <span class="brand">How the engine learned</span>
+    <span><a href="index.html">← back to the game</a></span>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>Nine generations of self-play</h1>
+  <p class="lede">The engine plays itself, learns which moves its own search spent
+    its time on, and keeps the result only when the new weights can beat the old
+    ones over a match. Every number those runs produced is on this page.</p>
+
+  <div class="kpis" data-kpis></div>
+
+  <div class="card">
+    <h2>Strength against the starting weights</h2>
+    <p class="sub">Each generation plays generation 0 — the hand-written starting
+      point — over 50 games, colours alternating. Filled marks were adopted by
+      their gate; hollow marks were thrown away by it. The bars are the 95%
+      interval on a match that short, and they are wide enough to explain why
+      two of the discarded generations look better here than the champion:
+      a 50-game match cannot tell these apart.</p>
+    <div data-chart="ladder"></div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <h2>Each generation against the champion it challenged</h2>
+      <p class="sub">Above the line it was adopted; below, discarded.</p>
+      <div data-chart="gate"></div>
+    </div>
+    <div class="card">
+      <h2>Self-play results</h2>
+      <p class="sub">How the games the model learned from actually ended.</p>
+      <div data-chart="selfplay"></div>
+      <div class="legend">
+        <span><i style="background:var(--series-1)"></i>crosses</span>
+        <span><i style="background:var(--series-2)"></i>noughts</span>
+        <span><i style="background:var(--series-3)"></i>drawn</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <h2>Fitting: held-out loss</h2>
+      <p class="sub">Cross-entropy on the tenth of positions never fitted on. One
+        line per generation, oldest palest.</p>
+      <div data-chart="loss"></div>
+      <div class="ramp" data-ramp="loss"></div>
+    </div>
+    <div class="card">
+      <h2>Fitting: agreement with the search</h2>
+      <p class="sub">How often the model's favourite move is the search's favourite.</p>
+      <div data-chart="agree"></div>
+      <div class="ramp" data-ramp="agree"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Every weight, every generation</h2>
+    <p class="sub">All 24 things the model notices about a move, across every
+      generation trained. Blue is a reason to play a move, red a reason not to;
+      the deeper the colour the stronger the opinion.</p>
+    <div data-chart="weights"></div>
+  </div>
+
+  <div class="card">
+    <h2>The playoff that settled it</h2>
+    <p class="sub">On the 50-game ladder, two generations their own gate had
+      thrown away looked better than the champion. Three 200-game matches were
+      played to find out whether that was real. It was not: the champion held.
+      The lesson is about the instrument, not the engine — a short match cannot
+      resolve a small difference.</p>
+    <div class="scroll"><table data-table="playoff"></table></div>
+  </div>
+
+  <div class="card scroll">
+    <table data-table="generations"><caption>Every generation, in full</caption></table>
+  </div>
+
+  <div class="card scroll">
+    <table data-table="weights"><caption>The weights themselves</caption></table>
+  </div>
+
+  <div class="row2">
+    <div class="card scroll">
+      <table data-table="throughput"><caption>Search speed, measured on a midgame position</caption></table>
+    </div>
+    <div class="card scroll">
+      <table data-table="matches"><caption>Every match played to measure a change</caption></table>
+    </div>
+  </div>
+
+  <p class="foot">Built from <code>train/weights/</code> by <code>train/collect.js</code>.
+    The method is written up in <a href="https://github.com/HusaynYahya/noughtsandcrosses/blob/main/PAPER.md">PAPER.md</a>;
+    the training scripts are in <a href="https://github.com/HusaynYahya/noughtsandcrosses/tree/main/train">train/</a>.
+    <span data-built></span></p>
+</main>
+
+<div class="tip" data-tip></div>
+<script src="assets/js/progress-data.js?v=1"></script>
+<script src="assets/js/progress.js?v=1"></script>
+</body>
+</html>

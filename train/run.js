@@ -36,16 +36,35 @@ function run(cmd, args) {
   return r.stdout || "";
 }
 
-/* where we are now */
-var best = path.join(DIR, "gen-0.json");
-if (!fs.existsSync(best)) {
+/* Where we are now. Training picks up where it left off: the generations
+   already on disk are read, the last one that was kept becomes the champion
+   to beat, and numbering carries on from the highest. */
+var zero = path.join(DIR, "gen-0.json");
+if (!fs.existsSync(zero)) {
   var shipped = lib.engine(null).weights;
-  lib.writeWeights(best, { generation: 0, trainedOn: 0,
+  lib.writeWeights(zero, { generation: 0, trainedOn: 0,
                            note: "set by hand, before any training", w: shipped.w });
 }
 
-var log = [];
-for (var g = 1; g <= GENERATIONS; g++) {
+var historyFile = path.join(DIR, "history.json");
+var log = fs.existsSync(historyFile) ? lib.readWeights(historyFile) : [];
+var done = fs.readdirSync(DIR)
+  .map(function (f) { return /^gen-(\d+)\.json$/.exec(f); })
+  .filter(Boolean).map(function (m) { return +m[1]; })
+  .sort(function (a, b) { return a - b; });
+var last = done.length ? done[done.length - 1] : 0;
+
+var best = zero;
+for (var i = 1; i <= last; i++) {
+  var f = path.join(DIR, "gen-" + i + ".json");
+  if (fs.existsSync(f) && lib.readWeights(f).kept) best = f;
+}
+if (last) {
+  console.log("carrying on from " + path.basename(best, ".json") +
+              " (" + last + " generation(s) already run)");
+}
+
+for (var g = last + 1; g <= last + GENERATIONS; g++) {
   console.log("\n================ generation " + g + " ================");
   var data = path.join(DATA, "gen-" + g + ".jsonl");
   var cand = path.join(DIR, "gen-" + g + ".json");
@@ -76,7 +95,7 @@ for (var g = 1; g <= GENERATIONS; g++) {
   if (keep) best = cand;
 }
 
-fs.writeFileSync(path.join(DIR, "history.json"), JSON.stringify(log, null, 2) + "\n");
+fs.writeFileSync(historyFile, JSON.stringify(log, null, 2) + "\n");
 var champion = lib.readWeights(best);
 lib.publish(champion);
 console.log("\nshipped generation " + champion.generation + " to assets/js/weights.js");

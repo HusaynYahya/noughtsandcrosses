@@ -80,6 +80,11 @@ plays itself, the search's own choices are the teaching signal, and each
 generation is kept only if it beats the one before it over a match. That
 learning is worth about 68% against the hand-written priors it replaced, and
 the engine as it stands takes 89% against the plain search it started as.
+
+Nine generations were trained and five were kept. Every number those runs
+produced — the matches, the fitting curves, the self-play results and all 24
+weights of every generation — is charted on the
+[progress page](https://husaynyahya.github.io/noughtsandcrosses/progress.html).
 How it was done is written up in [PAPER.md](PAPER.md); to run the training
 again, see [train/](train/).
 

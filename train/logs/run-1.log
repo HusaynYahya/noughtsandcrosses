@@ -1,0 +1,221 @@
+
+================ generation 1 ================
+
+$ node /home/user/noughtsandcrosses/train/selfplay.js 240 700 /home/user/noughtsandcrosses/train/data/gen-1.jsonl /home/user/noughtsandcrosses/train/weights/gen-0.json
+  20/240 games, 1310 positions, 13s  (crosses 11, noughts 6, drawn 3)
+  40/240 games, 2623 positions, 27s  (crosses 21, noughts 11, drawn 8)
+  60/240 games, 3969 positions, 40s  (crosses 31, noughts 15, drawn 14)
+  80/240 games, 5280 positions, 54s  (crosses 40, noughts 22, drawn 18)
+  100/240 games, 6526 positions, 67s  (crosses 49, noughts 29, drawn 22)
+  120/240 games, 7850 positions, 81s  (crosses 55, noughts 39, drawn 26)
+  140/240 games, 9186 positions, 95s  (crosses 62, noughts 46, drawn 32)
+  160/240 games, 10469 positions, 108s  (crosses 69, noughts 54, drawn 37)
+  180/240 games, 11822 positions, 122s  (crosses 77, noughts 58, drawn 45)
+  200/240 games, 13130 positions, 135s  (crosses 88, noughts 65, drawn 47)
+  220/240 games, 14458 positions, 148s  (crosses 95, noughts 70, drawn 55)
+  240/240 games, 15825 positions, 162s  (crosses 97, noughts 79, drawn 64)
+wrote 15825 positions to /home/user/noughtsandcrosses/train/data/gen-1.jsonl
+
+$ node /home/user/noughtsandcrosses/train/train.js /home/user/noughtsandcrosses/train/data/gen-1.jsonl /home/user/noughtsandcrosses/train/weights/gen-1.json 12 /home/user/noughtsandcrosses/train/weights/gen-0.json
+reading /home/user/noughtsandcrosses/train/data/gen-1.jsonl
+  15825 positions
+  14243 to fit on, 1582 held back
+
+epoch   loss(fit)  loss(held)  agrees with the search
+  0      1.5592     1.5625      43.0%
+  1     1.5289     1.5312      48.4%
+  2     1.5323     1.5357      46.2%
+  3     1.5300     1.5316      47.7%
+  4     1.5295     1.5314      47.2%
+  5     1.5310     1.5336      47.8%
+  6     1.5286     1.5306      47.4%
+  7     1.5289     1.5301      47.6%
+  8     1.5293     1.5313      46.8%
+  9     1.5311     1.5331      48.1%
+  10    1.5299     1.5312      46.7%
+  11    1.5318     1.5341      46.7%
+  12    1.5310     1.5338      48.6%
+
+wrote /home/user/noughtsandcrosses/train/weights/gen-1.json
+held-out loss 1.5625 -> 1.5338, agreement 43.0% -> 48.6%
+  wins the board                    3.016
+  wins the game                     0.063
+  blocks their board                1.380
+  makes a pair                      0.603
+  sends them somewhere winnable     -1.676
+  sends them to the winning board   -1.326
+  gives them a free move            -0.871
+  sends them to a decided board     0.434
+  sends them back here              0.162
+  centre square                     -0.105
+  corner square                     -0.037
+  centre board                      0.341
+  corner board                      0.277
+  makes a big pair                  0.745
+  blocks a big pair                 0.211
+  my open lines there               0.477
+  their open lines there            0.277
+  board already mine                0.261
+  board already theirs              -0.402
+  board dead                        0.000
+  how far along                     -0.000
+  wins the board x phase            -1.582
+  sends winnable x phase            1.559
+  free move x phase                 0.565
+
+$ node /home/user/noughtsandcrosses/train/evaluate.js /home/user/noughtsandcrosses/train/weights/gen-1.json /home/user/noughtsandcrosses/train/weights/gen-0.json 60 600
+    20/60: a 11 b 5 drawn 4
+    40/60: a 23 b 10 drawn 7
+    60/60: a 35 b 14 drawn 11
+RESULT a 35 b 14 drawn 11 => 67.5% for a
+SCORE 67.50
+
+generation 1 scored 67.5% against generation 0 — KEPT
+
+================ generation 2 ================
+
+$ node /home/user/noughtsandcrosses/train/selfplay.js 240 700 /home/user/noughtsandcrosses/train/data/gen-2.jsonl /home/user/noughtsandcrosses/train/weights/gen-1.json
+  20/240 games, 1289 positions, 15s  (crosses 10, noughts 5, drawn 5)
+  40/240 games, 2580 positions, 29s  (crosses 19, noughts 14, drawn 7)
+  60/240 games, 3896 positions, 44s  (crosses 25, noughts 21, drawn 14)
+  80/240 games, 5200 positions, 58s  (crosses 34, noughts 29, drawn 17)
+  100/240 games, 6537 positions, 73s  (crosses 44, noughts 35, drawn 21)
+  120/240 games, 7847 positions, 87s  (crosses 50, noughts 43, drawn 27)
+  140/240 games, 9175 positions, 102s  (crosses 60, noughts 48, drawn 32)
+  160/240 games, 10451 positions, 116s  (crosses 72, noughts 52, drawn 36)
+  180/240 games, 11758 positions, 130s  (crosses 83, noughts 60, drawn 37)
+  200/240 games, 13061 positions, 145s  (crosses 93, noughts 68, drawn 39)
+  220/240 games, 14388 positions, 159s  (crosses 101, noughts 75, drawn 44)
+  240/240 games, 15673 positions, 174s  (crosses 106, noughts 88, drawn 46)
+wrote 15673 positions to /home/user/noughtsandcrosses/train/data/gen-2.jsonl
+
+$ node /home/user/noughtsandcrosses/train/train.js /home/user/noughtsandcrosses/train/data/gen-2.jsonl /home/user/noughtsandcrosses/train/weights/gen-2.json 12 /home/user/noughtsandcrosses/train/weights/gen-1.json
+reading /home/user/noughtsandcrosses/train/data/gen-2.jsonl
+  15673 positions
+  14106 to fit on, 1567 held back
+
+epoch   loss(fit)  loss(held)  agrees with the search
+  0      1.5275     1.5310      50.5%
+  1     1.5143     1.5212      51.0%
+  2     1.5152     1.5227      50.3%
+  3     1.5133     1.5186      50.9%
+  4     1.5139     1.5193      50.9%
+  5     1.5148     1.5192      50.4%
+  6     1.5154     1.5213      50.4%
+  7     1.5141     1.5194      51.1%
+  8     1.5141     1.5208      50.4%
+  9     1.5152     1.5209      50.8%
+  10    1.5149     1.5204      51.1%
+  11    1.5128     1.5181      51.2%
+  12    1.5130     1.5191      51.2%
+
+wrote /home/user/noughtsandcrosses/train/weights/gen-2.json
+held-out loss 1.5310 -> 1.5191, agreement 50.5% -> 51.2%
+  wins the board                    3.656
+  wins the game                     0.109
+  blocks their board                1.394
+  makes a pair                      0.763
+  sends them somewhere winnable     -2.011
+  sends them to the winning board   -1.791
+  gives them a free move            -0.519
+  sends them to a decided board     1.076
+  sends them back here              0.297
+  centre square                     -0.343
+  corner square                     -0.106
+  centre board                      0.521
+  corner board                      0.245
+  makes a big pair                  0.180
+  blocks a big pair                 0.331
+  my open lines there               0.174
+  their open lines there            0.384
+  board already mine                0.329
+  board already theirs              -0.067
+  board dead                        0.000
+  how far along                     0.000
+  wins the board x phase            -2.486
+  sends winnable x phase            2.610
+  free move x phase                 0.303
+
+$ node /home/user/noughtsandcrosses/train/evaluate.js /home/user/noughtsandcrosses/train/weights/gen-2.json /home/user/noughtsandcrosses/train/weights/gen-1.json 60 600
+    20/60: a 6 b 9 drawn 5
+    40/60: a 15 b 15 drawn 10
+    60/60: a 25 b 23 drawn 12
+RESULT a 25 b 23 drawn 12 => 51.7% for a
+SCORE 51.67
+
+generation 2 scored 51.7% against generation 1 — thrown away
+
+================ generation 3 ================
+
+$ node /home/user/noughtsandcrosses/train/selfplay.js 240 700 /home/user/noughtsandcrosses/train/data/gen-3.jsonl /home/user/noughtsandcrosses/train/weights/gen-1.json
+  20/240 games, 1276 positions, 13s  (crosses 9, noughts 8, drawn 3)
+  40/240 games, 2594 positions, 27s  (crosses 16, noughts 15, drawn 9)
+  60/240 games, 3879 positions, 40s  (crosses 26, noughts 21, drawn 13)
+  80/240 games, 5165 positions, 53s  (crosses 32, noughts 34, drawn 14)
+  100/240 games, 6493 positions, 67s  (crosses 35, noughts 44, drawn 21)
+  120/240 games, 7788 positions, 80s  (crosses 46, noughts 50, drawn 24)
+  140/240 games, 9064 positions, 93s  (crosses 56, noughts 58, drawn 26)
+  160/240 games, 10400 positions, 107s  (crosses 63, noughts 66, drawn 31)
+  180/240 games, 11691 positions, 120s  (crosses 73, noughts 71, drawn 36)
+  200/240 games, 13029 positions, 133s  (crosses 78, noughts 81, drawn 41)
+  220/240 games, 14373 positions, 147s  (crosses 86, noughts 88, drawn 46)
+  240/240 games, 15676 positions, 160s  (crosses 96, noughts 94, drawn 50)
+wrote 15676 positions to /home/user/noughtsandcrosses/train/data/gen-3.jsonl
+
+$ node /home/user/noughtsandcrosses/train/train.js /home/user/noughtsandcrosses/train/data/gen-3.jsonl /home/user/noughtsandcrosses/train/weights/gen-3.json 12 /home/user/noughtsandcrosses/train/weights/gen-1.json
+reading /home/user/noughtsandcrosses/train/data/gen-3.jsonl
+  15676 positions
+  14109 to fit on, 1567 held back
+
+epoch   loss(fit)  loss(held)  agrees with the search
+  0      1.5334     1.5530      47.7%
+  1     1.5223     1.5415      48.2%
+  2     1.5219     1.5412      48.5%
+  3     1.5211     1.5392      48.2%
+  4     1.5211     1.5408      48.6%
+  5     1.5216     1.5419      47.9%
+  6     1.5213     1.5422      48.1%
+  7     1.5208     1.5406      48.2%
+  8     1.5211     1.5400      48.1%
+  9     1.5207     1.5401      48.4%
+  10    1.5223     1.5413      48.0%
+  11    1.5204     1.5392      47.9%
+  12    1.5214     1.5395      48.6%
+
+wrote /home/user/noughtsandcrosses/train/weights/gen-3.json
+held-out loss 1.5530 -> 1.5395, agreement 47.7% -> 48.6%
+  wins the board                    3.638
+  wins the game                     0.620
+  blocks their board                1.350
+  makes a pair                      0.915
+  sends them somewhere winnable     -1.975
+  sends them to the winning board   -1.289
+  gives them a free move            -0.662
+  sends them to a decided board     1.032
+  sends them back here              0.218
+  centre square                     -0.290
+  corner square                     -0.161
+  centre board                      0.411
+  corner board                      0.420
+  makes a big pair                  0.548
+  blocks a big pair                 0.192
+  my open lines there               -0.240
+  their open lines there            -0.068
+  board already mine                -0.127
+  board already theirs              -0.404
+  board dead                        0.000
+  how far along                     0.000
+  wins the board x phase            -2.649
+  sends winnable x phase            2.531
+  free move x phase                 0.723
+
+$ node /home/user/noughtsandcrosses/train/evaluate.js /home/user/noughtsandcrosses/train/weights/gen-3.json /home/user/noughtsandcrosses/train/weights/gen-1.json 60 600
+    20/60: a 10 b 7 drawn 3
+    40/60: a 19 b 16 drawn 5
+    60/60: a 31 b 22 drawn 7
+RESULT a 31 b 22 drawn 7 => 57.5% for a
+SCORE 57.50
+
+generation 3 scored 57.5% against generation 2 — KEPT
+
+shipped generation 3 to assets/js/weights.js

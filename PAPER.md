@@ -232,20 +232,38 @@ after the cost came back down did the quality show up on the scoreboard.
 
 ### 6.2 The generations
 
-Three generations were run: 240 self-play games each at 700 playouts a move,
+Nine generations were run — the numbers below, and the charts on the
+[progress page](https://husaynyahya.github.io/noughtsandcrosses/progress.html),
+are the whole record. 240 self-play games each at 700 playouts a move,
 roughly 15,000 recorded positions per generation, twelve training epochs, and
-a 60-game gating match against the reigning champion.
+a 60-game gating match against the reigning champion. Five were adopted and
+four were thrown away.
 
-| generation | held-out loss | agrees with the search | match against champion | kept |
-| --- | --- | --- | --- | --- |
-| 1 | 1.5625 → 1.5338 | 43.0% → 48.6% | **67.5%** vs gen 0 | yes |
-| 2 | 1.5310 → 1.5191 | 50.5% → 51.2% | 51.7% vs gen 1 | **no** |
-| 3 | 1.5530 → 1.5395 | 47.7% → 48.6% | **57.5%** vs gen 1 | yes |
+| generation | learned from | match against champion | kept |
+| --- | --- | --- | --- |
+| 1 | gen 0 | **67.5%** | yes |
+| 2 | gen 1 | 51.7% | no |
+| 3 | gen 1 | **57.5%** | yes |
+| 4 | gen 3 | 50.0% | no |
+| 5 | gen 3 | **58.3%** | yes |
+| 6 | gen 5 | 44.2% | no |
+| 7 | gen 5 | **53.3%** | yes |
+| 8 | gen 7 | **53.3%** | yes |
+| 9 | gen 8 | 48.3% | no |
 
-Generation 2 is the case the gate exists for. It had the *best* training
-numbers of the three — the lowest held-out loss and the highest agreement with
-its teacher — and it could not beat the weights it was meant to improve on. It
-was discarded, and generation 3 was trained from generation 1's games instead.
+Two things stand out. The gains shrink — 67.5%, then 57.5, 58.3, 53.3, 53.3 —
+which is what a model approaching its ceiling looks like: the first generation
+had a hand-written starting point to beat, and each one after it had a better
+opponent. And **nearly half the generations were failures**. Generation 2 had
+the best training numbers of the whole run — the lowest held-out loss and the
+highest agreement with its teacher — and could not beat the weights it was
+meant to improve on. Generation 6 was worse still, losing its match outright at
+44.2%.
+
+Without the gate, four of those nine would have been shipped, at least two of
+them making the engine weaker. Training against your own search is a noisy
+business, and the loss curve cannot tell you which side of the noise you landed
+on.
 
 ### 6.3 What the learning was worth
 
@@ -254,6 +272,37 @@ same search, at the same number of playouts:
 
 > **68.0%** — 58 wins, 22 losses, 20 draws over 100 games (±9 points, 95%)
 > — about +130 Elo.
+
+Every generation was then played against generation 0 directly, 50 games each,
+to see the shape of the improvement rather than only the last step of it:
+
+| generation | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| against gen 0 | 52% | 58% | 65% | 76% | 63% | 72% | 75% | **67%** | 69% |
+| kept by its gate | yes | no | yes | no | yes | no | yes | **yes** | no |
+
+The trend is real and the ordering is not. Two generations their own gate threw
+away — 4 and 6 — score higher here than the champion, and generation 1, which
+won its gate 67.5%, manages only 52% in this one. Both matches are of the same
+pair at the same budget, and they disagree by fifteen points.
+
+### 6.3.1 The playoff
+
+That disagreement is the instrument, not the engine. At 50 games the 95%
+interval on a score is about ±14 points, so nearly every number in that row is
+consistent with nearly every other. To find out whether the top few generations
+actually differed, they were played again at 200 games:
+
+| match | result |
+| --- | --- |
+| gen 4 v gen 7 | 49.5% — level |
+| gen 4 v gen 8 | 43.3% — **gen 8 ahead** |
+| gen 7 v gen 8 | 48.0% — level |
+
+The champion held. Generation 4, which looked like the strongest engine in the
+run on a 50-game sample, loses to the shipped champion over 200. Nothing was
+re-shipped; the short matches had simply been telling a story about their own
+noise.
 
 And the engine as shipped — playout policy, solver and learned policy together
 — against the plain MCTS it started as, at equal time:
@@ -365,6 +414,28 @@ question is never asked of it. That is a sound division of labour with a solver
 in the engine — and a trap for anyone who removes the solver later and assumes
 the policy will cover for it.
 
+### 7.5 The gate is only as good as the match behind it
+
+Section 5.3 argues for gating a generation on a match rather than on the loss
+curve, and that argument stands. What the ladder exposed is that the gate used
+here — 60 games — is a much blunter instrument than it looks. At 60 games the
+95% interval is about ±13 points, and the real differences between consecutive
+generations are worth perhaps 5. Nearly half the gating decisions in this run
+were therefore close to coin tosses, and two of the generations thrown away may
+well have been fine.
+
+The 200-game playoff says the shipped champion is not worse than the
+generations rejected around it, so the outcome survived. That is luck as much
+as method. A run that wanted its ordering to mean something would need matches
+of several hundred games at each gate, which for this engine is minutes rather
+than seconds — affordable, and the first thing I would change.
+
+The general form of the mistake is worth naming, because it is not specific to
+games: **a selection procedure inherits the noise of its measurement.** Picking
+the best of nine candidates on a noisy metric mostly selects for a lucky
+measurement, and the more candidates there are, the more thoroughly the winner
+is chosen by its luck.
+
 ## 8. What would help next
 
 - **A value model to cut the playouts short.** Every playout runs to the end of
@@ -375,8 +446,11 @@ the policy will cover for it.
   everything it learned as soon as a move is played, and rebuilds from nothing.
 - **Running the search off the main thread.** In a worker it would not need to
   stop every twelve milliseconds to let the page draw.
-- **More self-play, and more of it per generation.** These generations are a
-  few hundred games each. The gains were still growing when the runs stopped.
+- **Longer gating matches.** See 7.5: the gate needs several hundred games per
+  decision, not sixty, before the ordering of generations means anything.
+- **More self-play, and more of it per generation.** These generations are 240
+  games each. The gains per generation were still positive when the run
+  stopped, though clearly shrinking.
 - **Feature crosses, or a small network, once a value model exists.** The
   linear policy will have a ceiling. It has not obviously been reached yet.
 

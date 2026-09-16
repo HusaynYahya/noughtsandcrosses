@@ -458,3 +458,5 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .rules__note { font-size: .78rem; color: var(--text-dim); margin: .8rem 0 0; }
 
 .fineprint { font-size: .72rem; color: var(--text-dim); margin: .2rem .2rem 1.5rem; line-height: 1.5; }
+.fineprint a { color: var(--text); }
+.fineprint a:hover { color: var(--go-hi); }
