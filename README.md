@@ -66,6 +66,13 @@ back up the moment you look at it again, and the other side keeps knocking
 meanwhile, so it recovers on its own; but the two of you will meet faster if
 the link is sent from somewhere else, or sent first and opened after.
 
+**If rooms will not work at all**, there is *Connect by hand* under the room
+controls, which needs no matchmaking service: one of you presses **I'll start**
+and sends the block of text it makes, the other pastes it in and sends back the
+block of text they get, the first pastes that in, and you are connected. It is
+clumsy and it works when nothing else does, because the only thing between the
+two browsers is whatever you used to send the text.
+
 **If a room will not open**, there is a *Check the connection* link under the
 room controls. It tries the three things a private game needs — the library,
 the matchmaking service, and whether this network lets two browsers reach each

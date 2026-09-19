@@ -43,7 +43,24 @@
         username: "openrelayproject", credential: "openrelayproject" }
     ]
   };
-  var PEER_OPTS = { debug: 0, config: ICE };
+  /* Which matchmaking service to use. The public cloud one by default; a page
+     can point somewhere else by setting UNC_PEER_SERVER before this file
+     loads, which is how the connection can be tested end to end against a
+     service running on the same machine — and how anybody who would rather
+     not depend on a public one can run their own. */
+  function peerOptions() {
+    var opts = { debug: 0, config: ICE };
+    var custom = root.UNC_PEER_SERVER;
+    if (custom && custom.host) {
+      opts.host = custom.host;
+      opts.port = custom.port;
+      opts.path = custom.path || "/";
+      opts.secure = !!custom.secure;
+      if (custom.key) opts.key = custom.key;
+    }
+    return opts;
+  }
+  var PEER_OPTS = peerOptions();
 
   /* Words chosen to be easy to read out over the phone. */
   var WORDS = ("amber anchor basil beacon bishop brass cedar cobalt copper coral " +
@@ -417,6 +434,13 @@
 
       connected: function () { return !!(conn && conn.open); },
 
+      /* Take on a connection made some other way — by hand, with no service. */
+      adopt: function (c, role) {
+        api.role = role;
+        api.code = "by hand";
+        wire(c);
+      },
+
       /* Called when the page is looked at again after being in the background. */
       wake: function () {
         if (closed || meeting || (conn && conn.open)) return;
@@ -554,8 +578,133 @@
     }
   }
 
+  /* ---- connecting with no service at all -------------------------------- */
+  /* Everything above depends on a public matchmaking service to introduce two
+     browsers. When that service is down — and it is free, so it does go down —
+     nothing else in here can help. This does the introduction by hand: one
+     side produces a block of text, the other pastes it in and produces a reply
+     block, the first pastes that back, and the two are connected. It is
+     clumsy, and it works when nothing else does, because the only thing
+     between the two browsers is whatever you use to send the text. */
+  function handshake(handlers) {
+    var h = handlers || {};
+    var pc = null, channel = null, closed = false;
+
+    function announce(text, kind) { if (h.status) h.status(text, kind || "waiting"); }
+
+    /* the shape the rest of this file expects of a connection */
+    function adapt(dc) {
+      var listeners = {};
+      var api = {
+        open: false,
+        on: function (ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); },
+        send: function (data) { if (api.open) dc.send(data); },
+        close: function () { try { dc.close(); } catch (e) {} }
+      };
+      function fire(ev, a) { (listeners[ev] || []).forEach(function (f) { f(a); }); }
+      dc.onopen = function () { api.open = true; fire("open"); };
+      dc.onmessage = function (e) { fire("data", e.data); };
+      dc.onclose = function () { api.open = false; fire("close"); };
+      dc.onerror = function (e) { fire("error", e); };
+      return api;
+    }
+
+    function ready(p) {
+      return new Promise(function (done) {
+        if (p.iceGatheringState === "complete") { done(); return; }
+        var timer = setTimeout(finish, 5000);   /* good enough beats perfect */
+        p.addEventListener("icegatheringstatechange", function () {
+          if (p.iceGatheringState === "complete") finish();
+        });
+        function finish() { clearTimeout(timer); done(); }
+      });
+    }
+
+    function pack(desc) {
+      var text = JSON.stringify({ t: desc.type, s: desc.sdp });
+      if (!root.CompressionStream) return Promise.resolve("u0" + btoa(text));
+      var stream = new Blob([text]).stream().pipeThrough(new root.CompressionStream("deflate-raw"));
+      return new Response(stream).arrayBuffer().then(function (buf) {
+        var bytes = new Uint8Array(buf), out = "";
+        for (var i = 0; i < bytes.length; i++) out += String.fromCharCode(bytes[i]);
+        return "u1" + btoa(out);
+      });
+    }
+
+    function unpack(code) {
+      var text = String(code || "").replace(/\s+/g, "");
+      var kind = text.slice(0, 2);
+      var body = text.slice(2);
+      if (kind !== "u0" && kind !== "u1") {
+        return Promise.reject(new Error("That does not look like one of these codes."));
+      }
+      var raw;
+      try { raw = atob(body); } catch (e) { return Promise.reject(new Error("That code is damaged.")); }
+      if (kind === "u0") return Promise.resolve(JSON.parse(raw));
+      var bytes = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      var stream = new Blob([bytes]).stream()
+        .pipeThrough(new root.DecompressionStream("deflate-raw"));
+      return new Response(stream).text().then(JSON.parse);
+    }
+
+    function make() {
+      pc = new (root.RTCPeerConnection || root.webkitRTCPeerConnection)(ICE);
+      pc.onconnectionstatechange = function () {
+        if (closed) return;
+        if (pc.connectionState === "failed") {
+          announce("The two browsers could not reach each other. Neither network " +
+                   "would allow it, even through a relay.", "error");
+        }
+      };
+      return pc;
+    }
+
+    return {
+      /* the starter: make a block of text to send */
+      offer: function () {
+        make();
+        var dc = pc.createDataChannel("unc", { ordered: true });
+        h.channel(adapt(dc));
+        announce("Making your code…");
+        return pc.createOffer()
+          .then(function (d) { return pc.setLocalDescription(d); })
+          .then(function () { return ready(pc); })
+          .then(function () { return pack(pc.localDescription); });
+      },
+
+      /* the friend: take their text, make the reply text */
+      answer: function (code) {
+        make();
+        pc.ondatachannel = function (ev) { h.channel(adapt(ev.channel)); };
+        announce("Reading their code…");
+        return unpack(code)
+          .then(function (d) { return pc.setRemoteDescription({ type: d.t, sdp: d.s }); })
+          .then(function () { return pc.createAnswer(); })
+          .then(function (d) { return pc.setLocalDescription(d); })
+          .then(function () { return ready(pc); })
+          .then(function () { return pack(pc.localDescription); });
+      },
+
+      /* the starter again: take the reply */
+      accept: function (code) {
+        if (!pc) return Promise.reject(new Error("Make your code first."));
+        announce("Reading their reply…");
+        return unpack(code).then(function (d) {
+          return pc.setRemoteDescription({ type: d.t, sdp: d.s });
+        });
+      },
+
+      close: function () {
+        closed = true;
+        try { pc && pc.close(); } catch (e) {}
+      }
+    };
+  }
+
   root.UNC = root.UNC || {};
-  root.UNC.net = { session: session, makeCode: makeCode, tidyCode: tidyCode,
+  root.UNC.net = { session: session, handshake: handshake,
+                   makeCode: makeCode, tidyCode: tidyCode,
                    readLink: readLink, looksLikeInvitation: looksLikeInvitation,
                    diagnose: diagnose };
 })(typeof window !== "undefined" ? window : globalThis);

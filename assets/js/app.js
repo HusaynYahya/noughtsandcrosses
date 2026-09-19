@@ -118,6 +118,14 @@
       netCheckBtn = $("[data-net-check]"),
       netCheckOut = $("[data-net-check-out]"),
       netReport   = $("[data-net-report]"),
+      handBox     = $("[data-byhand]"),
+      handStep    = $("[data-hand-step]"),
+      handSay     = $("[data-hand-say]"),
+      handOut     = $("[data-hand-out]"),
+      handOutRow  = $("[data-hand-out-row]"),
+      handIn      = $("[data-hand-in]"),
+      handInRow   = $("[data-hand-in-row]"),
+      handGo      = $("[data-hand-go]"),
       netCopyBtn  = $("[data-net-copy]"),
       tcSel     = $("[data-tc]"),
       tcCustom  = $("[data-tc-custom]"),
@@ -1112,8 +1120,10 @@
         chatReady();
         render();
         /* Work out why, without being asked: whoever is trying to help needs
-           to know which of the three things failed. */
+           to know which of the three things failed. And point at the way in
+           that needs no service, since a service is the usual trouble. */
         if (!lastCheck) runNetCheck();
+        handBox.open = true;
       }
     });
     return net;
@@ -1216,6 +1226,98 @@
       showRoom(session.code);
       render();
     }).catch(function () { /* the status line has already said so */ });
+  }
+
+  /* ---- connecting by hand, with no service ----------------------------- */
+  var hand = null, handRole = null, handStage = null;
+
+  function handSession() {
+    if (net) net.close();
+    net = NET.session({
+      status: netStatus,
+      open: function () {
+        say("note", "Connected by hand.");
+        if (net.role === "host") broadcast(); else net.send({ t: "hello" });
+        chatReady();
+        render();
+      },
+      message: onMessage,
+      close: function () { say("note", "Your friend has gone."); chatReady(); render(); }
+    });
+    if (hand) hand.close();
+    hand = NET.handshake({
+      status: netStatus,
+      channel: function (c) { net.adopt(c, handRole); }
+    });
+    return hand;
+  }
+
+  function handShow(say_, outText, wantIn, goLabel) {
+    handStep.hidden = false;
+    handSay.textContent = say_;
+    handOut.hidden = handOutRow.hidden = !outText;
+    if (outText) handOut.value = outText;
+    handIn.hidden = handInRow.hidden = !wantIn;
+    if (wantIn) { handIn.value = ""; handGo.textContent = goLabel || "Use it"; }
+  }
+
+  function handStart() {
+    handRole = "host";
+    seat = X;
+    handStage = "wait-reply";
+    handSession().offer().then(function (code) {
+      handShow("1. Send your friend this code. 2. Paste the code they send back.",
+               code, true, "Connect");
+      showRoom("by hand");
+      chatEl.hidden = false;
+      render();
+    }, function (err) { netStatus(err.message, "error"); });
+  }
+
+  function handJoin() {
+    handRole = "guest";
+    seat = O;
+    handStage = "make-reply";
+    handSession();
+    handShow("Paste the code your friend sent you.", "", true, "Make my reply");
+  }
+
+  function handUse() {
+    var text = handIn.value.trim();
+    if (!text) return;
+    if (handStage === "make-reply") {
+      hand.answer(text).then(function (reply) {
+        handShow("Send this back to your friend. The game starts when they paste it.",
+                 reply, false);
+        showRoom("by hand");
+        chatEl.hidden = false;
+        render();
+      }, function (err) { netStatus(err.message, "error"); });
+    } else {
+      hand.accept(text).then(function () {
+        handShow("Connecting…", "", false);
+      }, function (err) { netStatus(err.message, "error"); });
+    }
+  }
+
+  function handCopy(ev) {
+    var btn = ev.currentTarget;
+    var text = handOut.value;
+    var done = function () {
+      btn.textContent = "Copied";
+      setTimeout(function () { btn.textContent = "Copy this code"; }, 1800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {
+        handOut.select();
+        btn.textContent = "Copy it from the box";
+      });
+    } else {
+      handOut.select();
+      try { document.execCommand("copy"); done(); } catch (e) {
+        btn.textContent = "Copy it from the box";
+      }
+    }
   }
 
   /* ---- when a room will not open --------------------------------------- */
@@ -1380,6 +1482,10 @@
     $("[data-leave]").addEventListener("click", leaveRoom);
     netCheckBtn.addEventListener("click", function () { runNetCheck(); });
     netCopyBtn.addEventListener("click", copyNetReport);
+    $("[data-hand-start]").addEventListener("click", handStart);
+    $("[data-hand-join]").addEventListener("click", handJoin);
+    handGo.addEventListener("click", handUse);
+    $("[data-hand-copy]").addEventListener("click", handCopy);
     chatForm.addEventListener("submit", sendChat);
     $("[data-copy]").addEventListener("click", copyInvite);
     window.addEventListener("beforeunload", function () { if (net) net.close(); });

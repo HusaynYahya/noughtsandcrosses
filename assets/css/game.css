@@ -353,6 +353,20 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .netcheck b { color: var(--text-strong); font-weight: 600; }
 .netcheck .working::before { content: "…"; }
 
+/* connecting with no service at all */
+.byhand { margin-top: .8rem; border-top: 1px solid var(--line); padding-top: .7rem; }
+.byhand summary { font-size: .72rem; color: var(--go-hi); cursor: pointer; list-style: none; }
+.byhand summary::-webkit-details-marker { display: none; }
+.byhand summary::after { content: "  ›"; }
+.byhand[open] summary::after { content: "  ⌄"; }
+.byhand__note { font-size: .72rem; line-height: 1.45; color: var(--text-dim); margin: .6rem 0; }
+.byhand__step { font-size: .76rem; line-height: 1.45; color: var(--text-strong); margin: .7rem 0 .4rem; }
+.byhand__box {
+  width: 100%; font-family: var(--mono); font-size: .68rem; line-height: 1.35;
+  color: var(--text); background: var(--bg-2); border: 1px solid var(--line);
+  padding: .5rem; margin: .3rem 0; resize: vertical; word-break: break-all;
+}
+
 /* ---- move list -------------------------------------------------------- */
 .moves {
   max-height: 13rem; overflow-y: auto; overscroll-behavior: contain;
