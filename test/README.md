@@ -17,6 +17,15 @@ node test/real.mjs               # two browsers, a room, a move, a message
 node test/byhand.mjs             # the same with no matchmaking service at all
 ```
 
+```sh
+node test/turnserver.js          # a relay on 127.0.0.1:3478 (gamer/letmein)
+node test/relay.mjs              # the relay test button, and a game forced through it
+```
+
+`relay.mjs` proves three things: that a right password passes, that a wrong one
+is reported as refused rather than as a broken network, and that a whole game
+plays through a relay with no direct route allowed at all.
+
 `real.mjs` points the page at the local service by setting `UNC_PEER_SERVER`
 before the page's own scripts run — the same hook anybody can use to run their
 own service instead of the public one.

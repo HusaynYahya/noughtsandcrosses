@@ -609,6 +609,58 @@
     }
   }
 
+  /* Is the relay actually working? Ask it for an address and see whether it
+     gives one. Nothing else in a connection can be checked so directly: if
+     this passes, the relay and its password are right, and a game will go
+     through it when neither network will allow a direct link. */
+  function testRelay(done) {
+    var RTC = root.RTCPeerConnection || root.webkitRTCPeerConnection;
+    if (!RTC) { done({ ok: false, detail: "This browser cannot do WebRTC at all." }); return; }
+    var own = savedRelay();
+    var pc, settled = false, got = false;
+    try {
+      pc = new RTC({ iceServers: ICE.iceServers, iceTransportPolicy: "relay" });
+      pc.createDataChannel("probe");
+    } catch (e) {
+      done({ ok: false, detail: "Could not start: " + e.message });
+      return;
+    }
+    var timer = setTimeout(finish, 9000);
+    pc.onicecandidate = function (ev) {
+      if (!ev.candidate) { finish(); return; }
+      if (ev.candidate.type === "relay" || /typ relay/.test(ev.candidate.candidate || "")) {
+        got = true;
+        finish();
+      }
+    };
+    pc.onicecandidateerror = function (ev) {
+      /* 401 and 403 here mean the relay answered but did not like the password */
+      if (!got && ev && (ev.errorCode === 401 || ev.errorCode === 403)) {
+        finish("The relay answered but refused the username or password.");
+      }
+    };
+    pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
+      .catch(function (e) { finish("Could not start: " + e.message); });
+
+    function finish(why) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { pc.close(); } catch (e) {}
+      done({
+        ok: got,
+        detail: got
+          ? (own ? "Your relay works — it gave this browser an address."
+                 : "A public relay answered.")
+          : why || (own
+              ? "Your relay did not answer. Check the address, the username and " +
+                "the password, and that the address starts with turn:"
+              : "No relay answered. The free public ones are unreliable; put " +
+                "your own in above.")
+      });
+    }
+  }
+
   /* ---- connecting with no service at all -------------------------------- */
   /* Everything above depends on a public matchmaking service to introduce two
      browsers. When that service is down — and it is free, so it does go down —
@@ -687,7 +739,10 @@
     var swapped = false;
 
     function make() {
-      pc = new (root.RTCPeerConnection || root.webkitRTCPeerConnection)(ICE);
+      var conf = { iceServers: ICE.iceServers };
+      /* used by the tests to prove a game really does go through a relay */
+      if (root.UNC_FORCE_RELAY) conf.iceTransportPolicy = "relay";
+      pc = new (root.RTCPeerConnection || root.webkitRTCPeerConnection)(conf);
       pc.onconnectionstatechange = function () {
         if (closed || !pc) return;
         var state = pc.connectionState;
@@ -754,7 +809,7 @@
 
   root.UNC = root.UNC || {};
   root.UNC.net = { session: session, handshake: handshake,
-                   savedRelay: savedRelay, setRelay: setRelay,
+                   savedRelay: savedRelay, setRelay: setRelay, testRelay: testRelay,
                    makeCode: makeCode, tidyCode: tidyCode,
                    readLink: readLink, looksLikeInvitation: looksLikeInvitation,
                    diagnose: diagnose };

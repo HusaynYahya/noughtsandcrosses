@@ -1513,6 +1513,18 @@
       relaySaid.textContent = "Saved in this browser. Start the connection again to " +
         "use it — and make sure your friend has one too, or has this same one.";
     });
+    $("[data-relay-test]").addEventListener("click", function (ev) {
+      var btn = ev.currentTarget;
+      btn.disabled = true;
+      btn.textContent = "Testing…";
+      relaySaid.textContent = "Asking the relay for an address…";
+      NET.testRelay(function (r) {
+        btn.disabled = false;
+        btn.textContent = "Test it";
+        relaySaid.textContent = (r.ok ? "✓ " : "✕ ") + r.detail;
+        relaySaid.style.color = r.ok ? "var(--go-hi)" : "#e0876f";
+      });
+    });
     $("[data-relay-clear]").addEventListener("click", function () {
       NET.setRelay(null);
       relayUrl.value = relayUser.value = relayPass.value = "";
