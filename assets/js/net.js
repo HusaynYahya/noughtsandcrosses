@@ -24,6 +24,27 @@
   var PEERJS_FALLBACK = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
   var PREFIX = "unc-v1-";        /* keeps our room codes clear of other apps */
 
+  /* How two browsers find a way to each other. The STUN servers let each side
+     learn how it looks from outside; that is enough for most home networks.
+     Where it is not — a lot of mobile networks, and offices — nothing direct
+     can be arranged at all, and the traffic has to be bounced through a relay.
+     The relays below are free and public. They carry the moves but cannot read
+     them: a data channel is encrypted end to end, so a relay only ever handles
+     ciphertext. */
+  var ICE = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443?transport=tcp",
+        username: "openrelayproject", credential: "openrelayproject" }
+    ]
+  };
+  var PEER_OPTS = { debug: 0, config: ICE };
+
   /* Words chosen to be easy to read out over the phone. */
   var WORDS = ("amber anchor basil beacon bishop brass cedar cobalt copper coral " +
     "delta ember falcon flint garnet harbour indigo ivory jasper kestrel lantern " +
@@ -47,8 +68,12 @@
      capitals. Pull the four code words out of whatever arrives. */
   function tidyCode(raw) {
     var text = String(raw || "").toLowerCase();
-    var hash = text.lastIndexOf("#");
-    if (hash > -1) text = text.slice(hash + 1);          /* prefer the link's code */
+    var room = /[?&]room=([^&#\s]+)/.exec(text);
+    if (room) text = room[1];                            /* ?room=… survives sharing */
+    else {
+      var hash = text.lastIndexOf("#");
+      if (hash > -1) text = text.slice(hash + 1);        /* …and #… when it does */
+    }
     var words = text.split(/[^a-z]+/).filter(Boolean);
     var known = words.filter(function (w) { return WORD_SET[w]; });
     /* Codes are built from a known list, so the real words can be picked out
@@ -57,6 +82,30 @@
        name exactly what was read. */
     var use = known.length >= 4 ? known.slice(0, 4) : words.slice(0, 4);
     return use.join("-");
+  }
+
+  /* Reading a code out of the page's own address is a stricter business than
+     reading one a person typed. Anything can end up in a query string — the
+     tracking junk messaging apps add, for one — and inventing a room code out
+     of it means quietly holding a room open at an address nobody else will
+     ever guess. A real code is four words from the list, so at least three of
+     them have to be. */
+  function readLink(search, hash) {
+    var carried = /[?&]room=([^&#\s]+)/i.exec(search || "");
+    var text = carried ? carried[1] : String(hash || "").replace(/^#/, "");
+    if (!text) return "";
+    var words = text.toLowerCase().split(/[^a-z]+/).filter(Boolean).slice(0, 4);
+    var known = words.filter(function (w) { return WORD_SET[w]; });
+    /* The words are returned as they arrived, odd one included: a code with a
+       word mangled in transit cannot be repaired by guessing, and a code three
+       words long would quietly open a room at an address nobody is heading
+       for. Better it fails and says so. */
+    return known.length >= 3 ? words.join("-") : "";
+  }
+
+  /* did this address look like it was meant to be an invitation? */
+  function looksLikeInvitation(search, hash) {
+    return /[?&]room=/i.test(search || "") || /^#.+/.test(hash || "");
   }
 
   /* ---- loading PeerJS on demand ---------------------------------------- */
@@ -170,7 +219,7 @@
         return new Promise(function (done, reject) {
           if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
           var settled = false;
-          var p = new Peer(PREFIX + code, { debug: 0 });
+          var p = new Peer(PREFIX + code, PEER_OPTS);
           peer = p;
           p.on("open", function () { if (!settled) { settled = true; done(true); } });
           p.on("connection", function (c) {
@@ -195,7 +244,7 @@
         return new Promise(function (done, reject) {
           if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
           var attempts = 0, timer = null, settled = false;
-          var p = new Peer({ debug: 0 });
+          var p = new Peer(PEER_OPTS);
           peer = p;
 
           p.on("open", function () { go(); });
@@ -333,7 +382,12 @@
       connected: function () { return !!(conn && conn.open); },
 
       link: function () {
-        return location.origin + location.pathname + "#" + api.code;
+        /* The code goes in the query as well as the fragment: some messaging
+           apps and link wrappers drop the part after the #, and a link that
+           arrives without its code looks to the person clicking it like an
+           ordinary game that simply will not connect. */
+        return location.origin + location.pathname +
+               "?room=" + api.code + "#" + api.code;
       },
 
       close: function () {
@@ -392,7 +446,7 @@
       return new Promise(function (done) {
         var peer, settled = false;
         var timer = setTimeout(function () { finish(false, "no answer within 12 seconds"); }, 12000);
-        try { peer = new root.Peer({ debug: 0 }); }
+        try { peer = new root.Peer(PEER_OPTS); }
         catch (e) { finish(false, e.message); return; }
         peer.on("open", function (id) { finish(true, "answered, and called this browser " + id); });
         peer.on("error", function (err) {
@@ -418,7 +472,7 @@
       return new Promise(function (done) {
         var RTC = root.RTCPeerConnection || root.webkitRTCPeerConnection;
         if (!RTC) { note("This browser's connection support", false, "WebRTC is not available"); done(); return; }
-        var pc, settled = false, found = false;
+        var pc, settled = false, found = false, relay = false;
         try {
           pc = new RTC({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
           pc.createDataChannel("probe");
@@ -427,8 +481,10 @@
         var timer = setTimeout(function () { finish(null); }, 8000);
         pc.onicecandidate = function (ev) {
           if (!ev.candidate) { finish(null); return; }
-          if (ev.candidate.type === "srflx" ||
-              /typ srflx/.test(ev.candidate.candidate || "")) { found = true; finish(null); }
+          var text = ev.candidate.candidate || "";
+          if (ev.candidate.type === "relay" || /typ relay/.test(text)) { relay = true; }
+          if (ev.candidate.type === "srflx" || /typ srflx/.test(text)) { found = true; }
+          if (found && relay) finish(null);
         };
         pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
           .catch(function (e) { finish("could not start: " + e.message); });
@@ -438,11 +494,16 @@
           settled = true;
           clearTimeout(timer);
           try { pc && pc.close(); } catch (e) {}
-          note("This network", found, why ? why : found
-            ? "lets this browser be reached from outside"
-            : "did not let this browser find its own address from outside. Some " +
-              "office and mobile networks block that, and a direct connection " +
-              "cannot be made through them.");
+          note("This network", found || relay, why ? why
+            : found && relay ? "lets this browser be reached from outside, and a relay " +
+                "is there for the times it cannot"
+            : found ? "lets this browser be reached from outside. No relay answered, so " +
+                "a game will only work if your friend's network is as open as yours."
+            : relay ? "will not allow a direct connection, but a relay answered and the " +
+                "game will go through that instead"
+            : "would allow neither a direct connection nor a relay. Some office and " +
+              "mobile networks block both; another network, or a phone off wifi, " +
+              "is the way round it.");
           done();
         }
       });
@@ -450,5 +511,7 @@
   }
 
   root.UNC = root.UNC || {};
-  root.UNC.net = { session: session, makeCode: makeCode, tidyCode: tidyCode, diagnose: diagnose };
+  root.UNC.net = { session: session, makeCode: makeCode, tidyCode: tidyCode,
+                   readLink: readLink, looksLikeInvitation: looksLikeInvitation,
+                   diagnose: diagnose };
 })(typeof window !== "undefined" ? window : globalThis);

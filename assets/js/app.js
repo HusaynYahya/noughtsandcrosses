@@ -1183,7 +1183,9 @@
     chatReady();
     codeEl.textContent = "";
     netStatus("", "");
-    if (location.hash) history.replaceState(null, "", location.pathname);
+    if (location.hash || location.search) {
+      history.replaceState(null, "", location.pathname);
+    }
     reset(false);
   }
 
@@ -1373,11 +1375,19 @@
   loadTally();
   renderTally();
 
-  var invited = NET.tidyCode(location.hash);
+  var invited = NET.readLink(location.search, location.hash);
   if (invited) {
     setMode("online");
     joinInput.value = invited;
     joinRoom(invited);
+  } else if (NET.looksLikeInvitation(location.search, location.hash)) {
+    /* Something was tacked onto the address but no code could be read out of
+       it. Almost always a link that lost its tail on the way — say so, rather
+       than opening an ordinary game and leaving them wondering. */
+    setMode("online");
+    netStatus("That link looks like an invitation, but the code did not survive " +
+      "being sent. Ask your friend for the four words and type them in.", "error");
+    render();
   } else {
     render();
   }

@@ -45,10 +45,16 @@ Either player can press **New game** for a rematch; sides swap each time, so
 nobody keeps the advantage of going first.
 
 There is no server behind the game and no account to make. The two browsers talk
-to each other directly over WebRTC, so the moves never pass through anybody's
-database, and nothing is stored when you close the tab. A public matchmaking
-service introduces the two browsers to each other — it sees the room code and
-nothing else. Both players need the page open at the same time.
+to each other over WebRTC, so the moves never pass through anybody's database
+and nothing is stored when you close the tab. A public matchmaking service
+introduces the two browsers to each other — it sees the room code and nothing
+else. Both players need the page open at the same time.
+
+Most of the time the two browsers reach each other directly. Some networks —
+a lot of mobile ones, and many offices — will not allow that, and the moves are
+bounced through a public relay instead. A relay carries the traffic but cannot
+read it: a data channel is encrypted end to end, so what passes through is
+ciphertext.
 
 The connection library is kept in this repository and served alongside the
 game, so a blocked or unreachable CDN cannot stop a room opening.
