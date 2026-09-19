@@ -1,53 +1,33 @@
 /* ============================================================================
-   ULTIMATE NOUGHTS AND CROSSES — private games between two browsers
+   ULTIMATE NOUGHTS AND CROSSES — connecting the two of you by hand
    ----------------------------------------------------------------------------
-   There is no server behind this game. One player opens a private room and
-   gets a four-word code; the other types that code in. The two browsers then
-   talk to each other directly over WebRTC, and the moves never pass through
-   anybody's database. A public signalling broker is used for the introduction
-   only — it learns the room code and nothing else.
+   Rooms live in live.js now, where both browsers reach OUT to a message
+   service. What is left here is the way that needs no service of any kind: the
+   two browsers are introduced by you, passing two blocks of text between them,
+   and then talk directly.
 
-   The player who opened the room is the referee: their copy of the game is the
-   real one. The other browser sends its moves across and is sent the position
-   back, so the two can never drift apart.
+   That still asks the two networks to let each other in, which is exactly what
+   a lot of them will not do — so a relay can be given as well, and there is a
+   test for it, because "it did not work" is not a useful thing to be told.
 
-   PeerJS is fetched from a CDN the first time somebody asks to play online.
-   Until then this page loads nothing from anywhere else.
+   The four-word codes live here too, since both ways of playing use them.
    ============================================================================ */
 (function (root) {
   "use strict";
 
-  /* The library is kept in this repository and served from the same place as
-     the game, so a blocked or unreachable CDN cannot stop a room opening. The
-     CDN is only there in case the local copy is somehow missing. */
-  var PEERJS_SRC = "assets/vendor/peerjs-1.5.4.min.js";
-  var PEERJS_FALLBACK = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
-  var PREFIX = "unc-v1-";        /* keeps our room codes clear of other apps */
-
-  /* How two browsers find a way to each other. The STUN servers let each side
-     learn how it looks from outside; that is enough for most home networks.
-     Where it is not — a lot of mobile networks, and offices — nothing direct
-     can be arranged at all, and the traffic has to be bounced through a relay.
-     The relays below are free and public. They carry the moves but cannot read
-     them: a data channel is encrypted end to end, so a relay only ever handles
-     ciphertext. */
+  /* How two browsers find a way to each other, when they are talking directly.
+     STUN lets each side learn how it looks from outside; a relay carries the
+     traffic when neither network will allow anything direct. A relay cannot
+     read what it carries: a data channel is encrypted end to end. */
   var PUBLIC_RELAYS = [
     { urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject", credential: "openrelayproject" },
     { urls: "turn:openrelay.metered.ca:443",
-      username: "openrelayproject", credential: "openrelayproject" },
-    { urls: "turn:openrelay.metered.ca:443?transport=tcp",
       username: "openrelayproject", credential: "openrelayproject" }
   ];
   var ICE = { iceServers: [] };
-  /* Which matchmaking service to use. The public cloud one by default; a page
-     can point somewhere else by setting UNC_PEER_SERVER before this file
-     loads, which is how the connection can be tested end to end against a
-     service running on the same machine — and how anybody who would rather
-     not depend on a public one can run their own. */
-  /* A relay you have been given, kept in this browser. The free public ones
-     are unreliable and disappear; one of your own is the only dependable way
-     through a network that will not allow a direct connection. */
+
+  /* A relay you have been given, kept in this browser. */
   function savedRelay() {
     try {
       var raw = localStorage.getItem("unc.relay");
@@ -58,7 +38,7 @@
 
   function setRelay(urls, username, credential) {
     try {
-      if (!urls) { localStorage.removeItem("unc.relay"); }
+      if (!urls) localStorage.removeItem("unc.relay");
       else {
         localStorage.setItem("unc.relay", JSON.stringify({
           urls: urls, username: username || "", credential: credential || ""
@@ -77,21 +57,52 @@
     if (own) list.push(own);
     return list.concat(PUBLIC_RELAYS);
   }
-
-  function peerOptions() {
-    var opts = { debug: 0, config: ICE };
-    var custom = root.UNC_PEER_SERVER;
-    if (custom && custom.host) {
-      opts.host = custom.host;
-      opts.port = custom.port;
-      opts.path = custom.path || "/";
-      opts.secure = !!custom.secure;
-      if (custom.key) opts.key = custom.key;
-    }
-    return opts;
-  }
   ICE.iceServers = iceList();
-  var PEER_OPTS = peerOptions();
+
+  /* Is the relay working? Ask it for an address and see whether it gives one. */
+  function testRelay(done) {
+    var RTC = root.RTCPeerConnection || root.webkitRTCPeerConnection;
+    if (!RTC) { done({ ok: false, detail: "This browser cannot do WebRTC at all." }); return; }
+    var own = savedRelay();
+    var pc, settled = false, got = false;
+    try {
+      pc = new RTC({ iceServers: ICE.iceServers, iceTransportPolicy: "relay" });
+      pc.createDataChannel("probe");
+    } catch (e) { done({ ok: false, detail: "Could not start: " + e.message }); return; }
+    var timer = setTimeout(finish, 9000);
+    pc.onicecandidate = function (ev) {
+      if (!ev.candidate) { finish(); return; }
+      if (ev.candidate.type === "relay" || /typ relay/.test(ev.candidate.candidate || "")) {
+        got = true;
+        finish();
+      }
+    };
+    pc.onicecandidateerror = function (ev) {
+      if (!got && ev && (ev.errorCode === 401 || ev.errorCode === 403)) {
+        finish("The relay answered but refused the username or password.");
+      }
+    };
+    pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
+      .catch(function (e) { finish("Could not start: " + e.message); });
+
+    function finish(why) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { pc.close(); } catch (e) {}
+      done({
+        ok: got,
+        detail: got
+          ? (own ? "Your relay works — it gave this browser an address."
+                 : "A public relay answered.")
+          : why || (own
+              ? "Your relay did not answer. Check the address, the username and " +
+                "the password, and that the address starts with turn:"
+              : "No relay answered. The free public ones are unreliable; put " +
+                "your own in above.")
+      });
+    }
+  }
 
   /* Words chosen to be easy to read out over the phone. */
   var WORDS = ("amber anchor basil beacon bishop brass cedar cobalt copper coral " +
@@ -156,37 +167,10 @@
     return /[?&]room=/i.test(search || "") || /^#.+/.test(hash || "");
   }
 
-  /* ---- loading PeerJS on demand ---------------------------------------- */
-  var loading = null;
-  function loadPeer() {
-    if (root.Peer) return Promise.resolve(root.Peer);
-    if (loading) return loading;
-    loading = fetchScript(PEERJS_SRC).catch(function () {
-      return fetchScript(PEERJS_FALLBACK);
-    }).catch(function (err) {
-      loading = null;
-      throw err;
-    });
-    return loading;
-  }
-
-  function fetchScript(src) {
-    return new Promise(function (resolve, reject) {
-      var s = document.createElement("script");
-      s.src = src;
-      s.async = true;
-      s.onload = function () {
-        root.Peer ? resolve(root.Peer)
-                  : reject(new Error("The connection library loaded but was empty."));
-      };
-      s.onerror = function () {
-        reject(new Error("Could not load the connection library from " + src + "."));
-      };
-      document.head.appendChild(s);
-    });
-  }
-
-  /* ---- a session ------------------------------------------------------- */
+  /* ---- a game's worth of plumbing --------------------------------------- */
+  /* Whatever carries the messages — the message service, or a connection made
+     by hand — the game above wants the same few things: send, are we
+     connected, and tell me when something arrives. */
   /* handlers: { status, open, message, close, error } */
   /* How the drop-out check works: each side sends a quiet beat every few
      seconds. If nothing at all arrives for a while, the line is treated as
@@ -199,39 +183,10 @@
 
   function session(handlers) {
     var h = handlers || {};
-    var peer = null, conn = null, closed = false;
+    var conn = null, closed = false;
     var beat = null, watch = null, lastHeard = 0;
-    var wanted = null;            /* the code we are trying to be in a room at */
-    var meeting = false;          /* a meeting is already under way */
 
-    /* A phone pauses a page the moment you switch apps — to send the link, as
-       often as not. The line to the matchmaking service dies with it, while
-       the room address stays claimed for a while longer, so a friend arriving
-       finds a room that is there but will not answer. Nothing here recovered
-       from that: the page came back and simply sat. So every peer is watched,
-       and a page returning from the background picks the line back up. */
-    function watchLine(p) {
-      p.on("disconnected", function () {
-        if (closed || p.destroyed) return;
-        say("The line to the service dropped — picking it back up…");
-        revive(p, 0);
-      });
-    }
 
-    function revive(p, n) {
-      if (closed || !p || p.destroyed) return;
-      try { p.reconnect(); } catch (e) {}
-      setTimeout(function () {
-        if (closed || !p || p.destroyed) return;
-        if (p.disconnected) { revive(p, n + 1); return; }
-        say(conn && conn.open ? "Connected."
-          : api.role === "host" ? "Back. Waiting for your friend to join."
-          : "Back. Knocking again…");
-        if (!(conn && conn.open) && api.role === "guest" && wanted && !meeting) {
-          api.meet(wanted);
-        }
-      }, Math.min(1500 + n * 1500, 10000));
-    }
 
     function startBeat() {
       lastHeard = Date.now();
@@ -290,173 +245,12 @@
       c.on("error", function () { /* reported through the close handler */ });
     }
 
-    /* Take the code as our own address. Resolves true if we got it, false if
-       somebody else already has it. */
-    function claim(code) {
-      return loadPeer().then(function (Peer) {
-        return new Promise(function (done, reject) {
-          if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
-          var settled = false;
-          var p = new Peer(PREFIX + code, PEER_OPTS);
-          peer = p;
-          watchLine(p);
-          p.on("open", function () { if (!settled) { settled = true; done(true); } });
-          p.on("connection", function (c) {
-            if (conn && conn.open) { c.close(); return; }      /* a room is for two */
-            wire(c);
-          });
-          p.on("error", function (err) {
-            if (err && err.type === "unavailable-id") {
-              if (!settled) { settled = true; try { p.destroy(); } catch (e) {} peer = null; done(false); }
-              return;
-            }
-            if (!settled) { settled = true; fail(err, reject); }
-          });
-        });
-      });
-    }
-
-    /* Knock on somebody else's room. Resolves true once the connection is
-       open, false after `tries` goes unanswered. */
-    function knock(code, tries) {
-      return loadPeer().then(function (Peer) {
-        return new Promise(function (done, reject) {
-          if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
-          var attempts = 0, timer = null, settled = false;
-          var p = new Peer(PEER_OPTS);
-          peer = p;
-          watchLine(p);
-
-          p.on("open", function () { go(); });
-          p.on("error", function (err) {
-            if (err && err.type === "peer-unavailable") { again(); return; }
-            if (!settled) { settled = true; fail(err, reject); }
-          });
-
-          function go() {
-            if (closed || settled) return;
-            attempts++;
-            if (attempts > 1) {
-              say("Still knocking — attempt " + attempts + " of " + tries + "…");
-            }
-            var c = p.connect(PREFIX + code, { reliable: true });
-            wire(c);
-            c.on("open", function () { if (!settled) { settled = true; clearTimeout(timer); done(true); } });
-            clearTimeout(timer);
-            timer = setTimeout(function () {
-              if (settled || (conn && conn.open)) return;
-              try { c.close(); } catch (e) {}
-              again();
-            }, attempts === 1 && tries === 1 ? FIRST_KNOCK_MS : KNOCK_MS);
-          }
-
-          function again() {
-            if (closed || settled || (conn && conn.open)) return;
-            clearTimeout(timer);
-            if (attempts < tries) { setTimeout(go, 700); return; }
-            settled = true;
-            done(false);
-          }
-        });
-      });
-    }
-
     function taken() { return new Error("Somebody else is already at that code."); }
 
-    function notThere(code) {
-      var why = new Error("No room called \u201c" + code + "\u201d. Check the code is " +
-        "exactly right, and that your friend still has the page open.");
-      say(why.message, "error");
-      if (h.error) h.error(why);
-      return why;
-    }
 
     var api = {
       code: null,
       role: null,
-
-      /* Open a room under a code nobody has claimed. */
-      host: function (preferred) {
-        api.role = "host";
-        api.code = preferred ? tidyCode(preferred) : makeCode();
-        say("Opening the room…");
-        return claim(api.code).then(function (ok) {
-          if (ok) { say("Waiting for your friend to join…"); return api.code; }
-          if (preferred) throw taken();
-          api.code = makeCode();                 /* astronomically unlikely */
-          return api.host();
-        });
-      },
-
-      /* Knock on a room somebody else has opened. */
-      join: function (rawCode) {
-        api.role = "guest";
-        api.code = tidyCode(rawCode);
-        if (!api.code) return Promise.reject(new Error("Type the room code first."));
-        say("Looking for the room…");
-        return knock(api.code, TRIES).then(function (ok) {
-          if (ok) return api.code;
-          throw notThere(api.code);
-        });
-      },
-
-      /* Meet at a code.
-
-         Claiming an address is decided by the matchmaking service and nobody
-         else: exactly one browser can hold a given one. So the whole of the
-         arrangement is "try to take the room's address":
-
-           got it   — you are the host. You hold it, and you keep holding it.
-           taken    — somebody is already there, so knock on their door.
-
-         There is deliberately no looking around first, and a host never lets
-         go to go looking. An earlier version alternated between holding a room
-         and searching for one, which left windows where nobody was holding
-         anything and two people could walk past each other indefinitely. */
-      meet: function (rawCode) {
-        var code = tidyCode(rawCode);
-        if (!code) return Promise.reject(new Error("That link has no room code in it."));
-        api.code = code;
-        wanted = code;
-        if (meeting) return Promise.resolve(code);   /* one at a time */
-        meeting = true;
-        say("Looking for the room…");
-        return attempt(0).then(function (c) { meeting = false; return c; },
-                              function (e) { meeting = false; throw e; });
-
-        function attempt(n) {
-          if (closed) return Promise.resolve(code);
-          /* the same address Create a room holds, so the two ways in meet */
-          return claim(code).then(function (mine) {
-            if (mine) {
-              api.role = "host";
-              say("Waiting for your friend to join. Keep this page open — on a " +
-                  "phone, switching to another app pauses it.");
-              return code;                       /* and hold it, without fidgeting */
-            }
-            api.role = "guest";
-            say("Your friend is there — knocking…");
-            return knock(code, TRIES).then(function (ok) {
-              if (ok) return code;
-              /* The address is claimed but nobody answers. Usually their page
-                 is paused in the background — a phone does that the moment you
-                 switch apps — and it will answer again the moment they look at
-                 it. So keep knocking rather than giving up, and say what would
-                 help. Eventually the stale address lapses and the room can be
-                 taken over instead. */
-              if (closed) return code;
-              say(n < 2
-                ? "Their room is there but not answering. If their page is in the " +
-                  "background, ask them to open it again — still knocking…"
-                : "Still no answer. Ask your friend to reopen the page; if they " +
-                  "have gone, this will take the room over shortly…", "waiting");
-              return new Promise(function (go) {
-                setTimeout(go, Math.min(4000 + n * 2000, 12000));
-              }).then(function () { return attempt(n + 1); });
-            });
-          });
-        }
-      },
 
       send: function (msg) {
         if (conn && conn.open) { conn.send(JSON.stringify(msg)); return true; }
@@ -473,192 +267,22 @@
       },
 
       /* Called when the page is looked at again after being in the background. */
-      wake: function () {
-        if (closed || meeting || (conn && conn.open)) return;
-        if (peer && peer.disconnected && !peer.destroyed) { revive(peer, 0); return; }
-        if (wanted) api.meet(wanted);
-      },
+      wake: function () {},
 
       link: function () {
-        /* The code goes in the query as well as the fragment: some messaging
-           apps and link wrappers drop the part after the #, and a link that
-           arrives without its code looks to the person clicking it like an
-           ordinary game that simply will not connect. */
         return location.origin + location.pathname +
                "?room=" + api.code + "#" + api.code;
       },
 
       close: function () {
         closed = true;
-        wanted = null;
         stopBeat();
         if (conn) { try { conn.close(); } catch (e) {} conn = null; }
-        if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
       }
     };
 
-    function fail(err, reject) {
-      var message = (err && err.message) || "The connection failed.";
-      say(message, "error");
-      if (h.error) h.error(err);
-      if (reject) reject(err instanceof Error ? err : new Error(message));
-    }
 
     return api;
-  }
-
-  /* ---- when it will not connect ---------------------------------------- */
-  /* Three things have to work for a private room: the connection library has
-     to load, the public matchmaking service has to answer, and this network
-     has to let two browsers reach each other directly. This checks them one at
-     a time and says which one is the trouble, rather than leaving somebody
-     staring at "still knocking". */
-  function diagnose(onStep) {
-    var results = [];
-    function note(name, ok, detail) {
-      results.push({ name: name, ok: ok, detail: detail });
-      if (onStep) onStep(results.slice(), false);
-      return results;
-    }
-
-    var libOk = false;
-    return loadPeer().then(function () {
-      libOk = true;
-      note("The connection library", true, "loaded");
-    }, function (err) {
-      note("The connection library", false, err.message);
-    }).then(function () {
-      /* no point asking the matchmaking service anything without it */
-      return libOk ? broker() : null;
-    }).then(function () {
-      return reachable();               /* this one stands on its own */
-    }).then(function () {
-      if (onStep) onStep(results.slice(), true);
-      return results;
-    }, function () {
-      if (onStep) onStep(results.slice(), true);
-      return results;
-    });
-
-    /* does the matchmaking service answer, and give us an address? */
-    function broker() {
-      return new Promise(function (done) {
-        var peer, settled = false;
-        var timer = setTimeout(function () { finish(false, "no answer within 12 seconds"); }, 12000);
-        try { peer = new root.Peer(PEER_OPTS); }
-        catch (e) { finish(false, e.message); return; }
-        peer.on("open", function (id) { finish(true, "answered, and called this browser " + id); });
-        peer.on("error", function (err) {
-          finish(false, (err && err.type ? err.type : "failed") +
-            (err && err.message ? " — " + err.message : ""));
-        });
-        function finish(ok, detail) {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          try { peer && peer.destroy(); } catch (e) {}
-          note("The matchmaking service", ok, ok ? detail :
-            detail + ". It is a free public service and does go down; if the rest " +
-            "passes, waiting a while is usually all it takes.");
-          done();
-        }
-      });
-    }
-
-    /* can this network see itself from the outside? without that, two
-       browsers behind different routers cannot meet */
-    function reachable() {
-      return new Promise(function (done) {
-        var RTC = root.RTCPeerConnection || root.webkitRTCPeerConnection;
-        if (!RTC) { note("This browser's connection support", false, "WebRTC is not available"); done(); return; }
-        var pc, settled = false, found = false, relay = false;
-        try {
-          pc = new RTC({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-          pc.createDataChannel("probe");
-        } catch (e) { finish("could not start: " + e.message); return; }
-
-        var timer = setTimeout(function () { finish(null); }, 8000);
-        pc.onicecandidate = function (ev) {
-          if (!ev.candidate) { finish(null); return; }
-          var text = ev.candidate.candidate || "";
-          if (ev.candidate.type === "relay" || /typ relay/.test(text)) { relay = true; }
-          if (ev.candidate.type === "srflx" || /typ srflx/.test(text)) { found = true; }
-          if (found && relay) finish(null);
-        };
-        pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
-          .catch(function (e) { finish("could not start: " + e.message); });
-
-        function finish(why) {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          try { pc && pc.close(); } catch (e) {}
-          note("This network", found || relay, why ? why
-            : found && relay ? "lets this browser be reached from outside, and a relay " +
-                "is there for the times it cannot"
-            : found ? "lets this browser be reached from outside. No relay answered, so " +
-                "a game will only work if your friend's network is as open as yours."
-            : relay ? "will not allow a direct connection, but a relay answered and the " +
-                "game will go through that instead"
-            : "would allow neither a direct connection nor a relay. Some office and " +
-              "mobile networks block both; another network, or a phone off wifi, " +
-              "is the way round it.");
-          done();
-        }
-      });
-    }
-  }
-
-  /* Is the relay actually working? Ask it for an address and see whether it
-     gives one. Nothing else in a connection can be checked so directly: if
-     this passes, the relay and its password are right, and a game will go
-     through it when neither network will allow a direct link. */
-  function testRelay(done) {
-    var RTC = root.RTCPeerConnection || root.webkitRTCPeerConnection;
-    if (!RTC) { done({ ok: false, detail: "This browser cannot do WebRTC at all." }); return; }
-    var own = savedRelay();
-    var pc, settled = false, got = false;
-    try {
-      pc = new RTC({ iceServers: ICE.iceServers, iceTransportPolicy: "relay" });
-      pc.createDataChannel("probe");
-    } catch (e) {
-      done({ ok: false, detail: "Could not start: " + e.message });
-      return;
-    }
-    var timer = setTimeout(finish, 9000);
-    pc.onicecandidate = function (ev) {
-      if (!ev.candidate) { finish(); return; }
-      if (ev.candidate.type === "relay" || /typ relay/.test(ev.candidate.candidate || "")) {
-        got = true;
-        finish();
-      }
-    };
-    pc.onicecandidateerror = function (ev) {
-      /* 401 and 403 here mean the relay answered but did not like the password */
-      if (!got && ev && (ev.errorCode === 401 || ev.errorCode === 403)) {
-        finish("The relay answered but refused the username or password.");
-      }
-    };
-    pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
-      .catch(function (e) { finish("Could not start: " + e.message); });
-
-    function finish(why) {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try { pc.close(); } catch (e) {}
-      done({
-        ok: got,
-        detail: got
-          ? (own ? "Your relay works — it gave this browser an address."
-                 : "A public relay answered.")
-          : why || (own
-              ? "Your relay did not answer. Check the address, the username and " +
-                "the password, and that the address starts with turn:"
-              : "No relay answered. The free public ones are unreliable; put " +
-                "your own in above.")
-      });
-    }
   }
 
   /* ---- connecting with no service at all -------------------------------- */
@@ -811,6 +435,5 @@
   root.UNC.net = { session: session, handshake: handshake,
                    savedRelay: savedRelay, setRelay: setRelay, testRelay: testRelay,
                    makeCode: makeCode, tidyCode: tidyCode,
-                   readLink: readLink, looksLikeInvitation: looksLikeInvitation,
-                   diagnose: diagnose };
+                   readLink: readLink, looksLikeInvitation: looksLikeInvitation };
 })(typeof window !== "undefined" ? window : globalThis);

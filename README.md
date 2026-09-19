@@ -49,111 +49,33 @@ except a message you sent yourself.
 
 ## Playing a friend online
 
-One of you presses **Create a room** and gets a four-word code, such as
+Press **Make a code** and you get four words, such as
 `copper-kestrel-amber-quartz`. **Copy invitation** puts a link and the code on
-your clipboard to send however you like.
+your clipboard. Both of you open the same code — the link, or the words typed
+in — and the game starts. Neither of you has to be first.
 
-A code is a **place to meet**, not a room one of you owns. Whoever gets there
-first holds it open and the other walks in, so it does not matter which of you
-opens the link — or whether you both do. You can skip the link entirely and
-both type the same four words into **Join**; if you arrive at the same instant,
-one of you takes the room and the other is let in.
+**How it works, and why it changed.** The first version of this had the two
+browsers talk straight to each other. That is the elegant way and it is the
+wrong way: it asks both networks to let a stranger in, and plenty will not —
+most mobile networks, and most offices, let you out and nothing in. No amount
+of retrying fixes a network built to refuse.
 
-Either player can press **New game** for a rematch; sides swap each time, so
-nobody keeps the advantage of going first.
+So neither browser waits to be reached. Both reach **out** to a message
+service, the same direction as loading a web page, which every network allows;
+the service passes messages between the two outbound connections. Connecting
+takes about a second.
 
-There is no server behind the game and no account to make. The two browsers talk
-to each other over WebRTC, so the moves never pass through anybody's database
-and nothing is stored when you close the tab. A public matchmaking service
-introduces the two browsers to each other — it sees the room code and nothing
-else. Both players need the page open at the same time.
+The service sees nothing. The code never leaves the two browsers: the topic is
+a hash of it, and every message is sealed with a key derived from it, so what
+a public service carries is ciphertext under a meaningless name. Which of you
+plays crosses is settled by both sides at once — each announces a random
+number and the lower one goes first — so there is nothing to claim and nobody
+to wait for.
 
-Most of the time the two browsers reach each other directly. Some networks —
-a lot of mobile ones, and many offices — will not allow that, and the moves are
-bounced through a public relay instead. A relay carries the traffic but cannot
-read it: a data channel is encrypted end to end, so what passes through is
-ciphertext.
-
-The connection library is kept in this repository and served alongside the
-game, so a blocked or unreachable CDN cannot stop a room opening.
-
-**On a phone, keep the page open.** Switching to another app pauses it, and a
-paused page cannot answer the door — which is what happens if you open the
-link, then switch to your messages to send it. The page picks the connection
-back up the moment you look at it again, and the other side keeps knocking
-meanwhile, so it recovers on its own; but the two of you will meet faster if
-the link is sent from somewhere else, or sent first and opened after.
-
-**A relay of your own.** Free public relays come and go — the one this started
-with no longer answers — and without a working relay a lot of mobile and office
-networks cannot be joined at all. Any TURN server will do; a free account at
-metered.ca takes a couple of minutes and gives you an address, a username and a
-password. Paste them into the box under *Connect by hand* and press **Test it**,
-which asks the relay for an address and tells you plainly whether it worked,
-whether the password was refused, or whether nothing answered. One relay
-between the two of you is enough, and both of you should paste the same one.
-
-Before any of that, if both of you are on the same wifi, try again there: a
-direct connection usually works on one network and needs no relay at all.
-
-**If rooms will not work at all**, there is *Connect by hand* under the room
-controls, which needs no matchmaking service: one of you presses **I'll start**
-and sends the block of text it makes, the other pastes it in and sends back the
-block of text they get, the first pastes that in, and you are connected. It is
-clumsy and it works when nothing else does, because the only thing between the
-two browsers is whatever you used to send the text.
-
-**If a room will not open**, there is a *Check the connection* link under the
-room controls. It tries the three things a private game needs — the library,
-the matchmaking service, and whether this network lets two browsers reach each
-other — and says which one is the trouble. The third is the one no code can fix:
-some office and mobile networks will not allow a direct connection at all.
-
-If your friend's phone drops off the network mid-game, the page says so within
-about fifteen seconds. The room stays open: they can rejoin with the same code
-and carry on from the current position.
-
-## The clock
-
-Optional, and off until you choose it. There are two ways to keep time:
-
-**A bank of time each** — the chess way. Bullet, blitz and rapid presets, or
-your own minutes and increment. Whatever you do not spend on one move is
-yours to spend on the next.
-
-**Time for every move** — 15 seconds, 30 seconds, a minute, five minutes, or
-your own. Every turn starts with the whole allowance again, however long the
-last one took. Run out on a single move and you lose.
-
-Either way the clock does not start until the first move, taking a move back
-puts the clock back with it, and running out loses the game. In an online game
-the clock belongs to whoever opened the room, so the two sides can never
-disagree about whose flag fell.
-
-## The computer opponent
-
-Three levels — gentle, steady and ruthless. It plays by Monte-Carlo tree
-search: from the position in front of it, it plays out thousands of fast games
-to the end and keeps the moves that tend to end well. On top of that sit a
-solver, which proves outright wins and losses instead of sampling them, and a
-learned policy that decides which moves are worth the first playouts. It
-thinks in short slices so the page never freezes.
-
-The policy's weights were learned from the engine's own games: the engine
-plays itself, the search's own choices are the teaching signal, and each
-generation is kept only if it beats the one before it over a match. That
-learning is worth about 68% against the hand-written priors it replaced, and
-the engine as it stands takes 89% against the plain search it started as.
-
-Nine generations were trained and five were kept. Every number those runs
-produced — the matches, the fitting curves, the self-play results and all 24
-weights of every generation — is charted on the
-[progress page](https://husaynyahya.github.io/noughtsandcrosses/progress.html).
-
-How it was done is written up in
-**[the report](https://husaynyahya.github.io/noughtsandcrosses/paper.html)** —
-the same text as [PAPER.md](PAPER.md), as a page you can actually read in a
-browser. To run the training again, see [train/](train/).
+**If even that is blocked**, there is *Connect by hand* underneath: the two
+browsers are introduced by you passing two blocks of text between them, with
+no service at all. And if live play is not worth the trouble, there is
+[playing by message](#playing-a-friend-by-message), which needs nothing.
 
 ## Trying a line before you commit
 

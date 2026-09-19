@@ -26,6 +26,16 @@ node test/byhand.mjs             # the same with no matchmaking service at all
 ```
 
 ```sh
+node test/broker.js              # a message service on ws://127.0.0.1:9004
+node test/livetest.mjs           # two browsers, same code, a game between them
+```
+
+`livetest.mjs` is the one that matters for live play: it opens the same link in
+two separate browsers at the same moment and checks they connect, that a move
+and a message cross, and that twenty more moves leave both boards identical.
+It also shows what the service sees — an opaque topic and sealed blobs.
+
+```sh
 node test/turnserver.js          # a relay on 127.0.0.1:3478 (gamer/letmein)
 node test/relay.mjs              # the relay test button, and a game forced through it
 ```
@@ -34,6 +44,6 @@ node test/relay.mjs              # the relay test button, and a game forced thro
 is reported as refused rather than as a broken network, and that a whole game
 plays through a relay with no direct route allowed at all.
 
-`real.mjs` points the page at the local service by setting `UNC_PEER_SERVER`
+`livetest.mjs` points the page at the local service by setting `UNC_BROKERS`
 before the page's own scripts run — the same hook anybody can use to run their
-own service instead of the public one.
+own message service instead of the public ones.

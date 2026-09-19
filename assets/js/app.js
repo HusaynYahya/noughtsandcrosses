@@ -1122,12 +1122,14 @@
   }
 
   function startSession() {
-    net = NET.session({
+    net = window.UNC.live({
       status: netStatus,
       open: function () {
-        if (net.role === "host") { broadcast(); }
-        else { net.send({ t: "hello" }); }
-        say("note", net.role === "host" ? "Your friend has joined." : "You are in the room.");
+        /* which of the two plays crosses was settled by the transport, the
+           same way on both sides */
+        seat = net.role === "host" ? X : O;
+        if (net.role === "host") broadcast(); else net.send({ t: "hello" });
+        say("note", "Connected.");
         chatReady();
         render();
       },
@@ -1228,13 +1230,10 @@
     reset(false);
   }
 
+  /* A room is just a code both of you use; there is nothing to create or to
+     claim, so making one is only inventing the words. */
   function hostRoom() {
-    if (net) net.close();
-    seat = X;
-    startSession().host().then(function (code) {
-      showRoom(code);
-      reset(false);
-    }).catch(function () { /* the status line has already said so */ });
+    joinRoom(NET.makeCode());
   }
 
   function joinRoom(code) {
@@ -1244,9 +1243,8 @@
     joinInput.value = tidy;            /* show what was actually read */
     var session = startSession();
     showRoom(tidy);
-    session.meet(tidy).then(function () {
-      /* whoever got there first holds the room; the other one walks in */
-      seat = session.role === "host" ? X : O;
+    reset(false);
+    session.join(tidy).then(function () {
       showRoom(session.code);
       render();
     }).catch(function () { /* the status line has already said so */ });
@@ -1466,7 +1464,7 @@
     netCheckOut.hidden = false;
     netCheckOut.innerHTML = '<li class="working">Trying the three things a room needs…</li>';
 
-    NET.diagnose(function (steps, finished) {
+    window.UNC.live.check(function (steps, finished) {
       netCheckOut.innerHTML = steps.map(function (s) {
         return '<li class="' + (s.ok ? "ok" : "bad") + '"><b>' + s.name + "</b> — " +
                s.detail + "</li>";
