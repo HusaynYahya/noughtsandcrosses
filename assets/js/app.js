@@ -69,6 +69,17 @@
   var net = null, seat = X, netStatusText = "", tally = { 1: 0, 2: 0, 0: 0 };
   var counted = false;            /* has this game been added to the tally yet */
 
+  /* A live game is kept in three places at once, because a connection is not
+     a safe place to keep anything. `gid` names the game so the two sides can
+     tell "the game we are both playing" from "a game one of us has forgotten";
+     `roomCode` is what the record is filed under here; `startedHere` marks a
+     board that is empty on purpose, so a late message from the game before
+     cannot put the old one back. */
+  var gid = "", roomCode = "", startedHere = false;
+  function newGid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
   /* ---- the page -------------------------------------------------------- */
   var $ = function (sel) { return document.querySelector(sel); };
   var boardEl   = $("[data-board]"),
@@ -284,6 +295,7 @@
     clockAfterMove(mover);
     if (state.over) clockStop();
     render(move);
+    keepGame();
     analysisRun();
     if (state.over) finishGame();
   }
@@ -720,6 +732,7 @@
       if (mode === "online") broadcast();
       stopThinking();
       render();               /* the whole page, not just the clocks */
+      keepGame();
       return;
     }
     renderClocks();
@@ -1011,6 +1024,7 @@
     if (review.on) { review.on = false; review.done = false; review.scores = []; }
     analysis.marks = [];
     state = E.create();
+    gid = newGid();
     past = [];
     moves = [];
     counted = false;
@@ -1018,8 +1032,11 @@
     analysisReset();
     render();
     if (mode === "computer") computerTurn();
-    if (mode === "online" && net && net.role === "host" && broadcastIt !== false) broadcast();
+    if (mode === "online" && net && net.role === "host" && broadcastIt !== false) broadcast(true);
   }
+
+  /* A new game asked for here, rather than a board that happens to be empty */
+  function newGame(broadcastIt) { reset(broadcastIt); startedHere = true; keepGame(); }
 
   function undo() {
     if (mode === "online" || !past.length) return;
@@ -1086,15 +1103,98 @@
     chatInput.placeholder = live ? "Say something" : "Waiting for your friend…";
   }
 
+  /* ---- keeping the game ------------------------------------------------- */
+  /* Everything needed to put this game back exactly as it is, in one object.
+     It is what gets written down here, and what gets sent when the two sides
+     have to work out between them which of them still knows the game. */
+  function record(t) {
+    return { t: t, gid: gid, ply: moves.length, at: Date.now(),
+             state: E.pack(state), moves: moves.slice(), seat: seat,
+             tally: tally,
+             clock: { on: clock.on, mode: clock.mode, base: clock.base,
+                      inc: clock.inc, perMove: clock.perMove,
+                      x: clock.left[X], o: clock.left[O], running: clock.running } };
+  }
+
+  /* A record has to hang together before it is believed, wherever it came
+     from: the moves counted, and the position saying the same number. */
+  function sound(rec) {
+    if (!rec || !rec.state || !Array.isArray(rec.moves) || rec.moves.length > 81) return false;
+    for (var i = 0; i < rec.moves.length; i++) {
+      var m = rec.moves[i];
+      if (typeof m !== "number" || m < 0 || m > 80 || m !== (m | 0)) return false;
+    }
+    return E.unpack(rec.state).filled === rec.moves.length;
+  }
+
+  var KEEP = 12 * 3600 * 1000;    /* a record older than this is no use to anybody */
+
+  function keepGame() {
+    if (mode !== "online" || !roomCode) return;
+    try { localStorage.setItem("unc.live." + roomCode, JSON.stringify(record("keep"))); }
+    catch (e) {}
+  }
+
+  function savedGame(code) {
+    try {
+      var rec = JSON.parse(localStorage.getItem("unc.live." + code) || "null");
+      if (!sound(rec) || !rec.at || Date.now() - rec.at > KEEP) return null;
+      return rec;
+    } catch (e) { return null; }
+  }
+
+  /* Put a game back on the board: from this browser's own note of it, or from
+     the other player's copy when they are the one who still has it. */
+  function restore(rec) {
+    stopThinking();
+    if (explore.on) explore.on = false;
+    if (review.on) { review.on = false; review.done = false; review.scores = []; }
+    gid = rec.gid || newGid();
+    state = E.unpack(rec.state);
+    moves = rec.moves.slice();
+    if (rec.seat === X || rec.seat === O) seat = rec.seat;
+    past = [];
+    counted = state.over;
+    analysis.marks = [];
+    analysisReset();
+    if (rec.clock) {
+      clock.on = !!rec.clock.on;
+      clock.mode = rec.clock.mode === "move" ? "move" : "bank";
+      clock.base = rec.clock.base | 0;
+      clock.inc = rec.clock.inc | 0;
+      clock.perMove = rec.clock.perMove | 0;
+      clock.left[X] = rec.clock.x | 0;
+      clock.left[O] = rec.clock.o | 0;
+      clock.running = state.over ? 0 : rec.clock.running | 0;
+      /* time did not stop while the page was away: whoever was to move has
+         been thinking all along */
+      if (clock.running && rec.at) {
+        clock.left[clock.running] -= Math.max(0, Date.now() - rec.at);
+      }
+      clock.since = Date.now();
+      clock.flagged = 0;
+    }
+    startedHere = false;
+    render(state.last);
+  }
+
+  /* Is the record they are offering a better one than ours? Only ever their
+     copy of the same game with more of it, or a game we have no note of at
+     all — never over a board we emptied on purpose. */
+  function betterThanOurs(rec) {
+    if (!sound(rec) || startedHere) return false;
+    if (rec.gid && rec.gid === gid) return rec.moves.length > moves.length;
+    return moves.length === 0 && rec.moves.length > 0;
+  }
+
   /* ---- the private room ------------------------------------------------ */
-  function broadcast() {
+  function broadcast(fresh) {
     if (!net || net.role !== "host") return;
     clockSettle();
-    net.send({ t: "sync", state: E.pack(state), seat: seat === X ? O : X,
-               tally: tally, moves: moves,
-               clock: { on: clock.on, mode: clock.mode, base: clock.base,
-                        inc: clock.inc, perMove: clock.perMove,
-                        x: clock.left[X], o: clock.left[O], running: clock.running } });
+    var out = record("sync");
+    out.seat = seat === X ? O : X;        /* their side, not ours */
+    out.fresh = !!fresh;                  /* a board emptied on purpose */
+    net.send(out);
   }
 
   function netStatus(text, kind) {
@@ -1109,15 +1209,23 @@
       status: netStatus,
       open: function () {
         /* which of the two plays crosses was settled by the transport, the
-           same way on both sides */
-        seat = net.role === "host" ? X : O;
-        if (net.role === "host") broadcast(); else net.send({ t: "hello" });
+           same way on both sides — but a game already under way keeps the
+           sides it was played with, whatever the connection decides now */
+        if (!moves.length) seat = net.role === "host" ? X : O;
+        /* whoever answers brings their copy of the game with them, so a side
+           that has lost it can be given it back */
+        if (net.role === "host") broadcast(); else net.send(record("hello"));
         say("note", "Connected.");
         chatReady();
         render();
       },
       message: onMessage,
-      close: function () { say("note", "Your friend has gone."); chatReady(); render(); },
+      close: function () {
+        say("note", "Your friend has dropped out. The game is kept — it will " +
+                    "be here when they come back.");
+        chatReady();
+        render();
+      },
       error: function () {
         if (net && !net.connected()) {
           setupBox.hidden = false;
@@ -1148,7 +1256,21 @@
       return;
     }
     if (net.role === "host") {
-      if (msg.t === "hello") { broadcast(); return; }
+      if (msg.t === "hello" || msg.t === "resume") {
+        /* They still have the game and we do not — the usual shape of a
+           connection that dropped and came back. Take theirs. */
+        if (betterThanOurs(msg)) {
+          var mine = msg.seat === X ? O : X;
+          restore({ gid: msg.gid, state: msg.state, moves: msg.moves,
+                    seat: mine, clock: msg.clock, at: msg.at });
+          keepGame();
+          say("note", "Picked the game back up where it was.");
+        }
+        /* if our board is empty because we meant it to be, say so, or they
+           will keep offering us the game we have just finished with */
+        broadcast(startedHere && !moves.length);
+        return;
+      }
       if (msg.t === "move") {
         var guestSeat = seat === X ? O : X;
         if (!state.over && state.turn === guestSeat && E.isLegal(state, msg.move)) {
@@ -1157,13 +1279,33 @@
         broadcast();                       /* right or wrong, they get the truth */
         return;
       }
-      if (msg.t === "rematch") { swapSides(); reset(); return; }
+      if (msg.t === "rematch") { swapSides(); newGame(); return; }
     } else {
-      if (msg.t === "sync") applySync(msg);
+      if (msg.t === "sync") {
+        /* The referee's word is final about the game we are both playing —
+           but a sync that has lost the game is not the referee correcting us,
+           it is a page that came back empty. Send ours instead of taking it. */
+        var behind = msg.gid === gid ? (msg.ply | 0) < moves.length - 1
+                                     : (msg.ply | 0) < moves.length;
+        if (!msg.fresh && behind && moves.length) { offerOurs(); return; }
+        applySync(msg);
+      }
     }
   }
 
+  /* Hand our copy over, but not over and over: if they will not have it,
+     saying so again every time changes nothing. */
+  var offered = 0;
+  function offerOurs() {
+    if (Date.now() - offered < 3000) return false;
+    offered = Date.now();
+    net.send(record("resume"));
+    return true;
+  }
+
   function applySync(msg) {
+    gid = msg.gid || gid;
+    startedHere = false;
     seat = msg.seat === O ? O : X;
     state = E.unpack(msg.state);
     if (msg.tally) { tally = msg.tally; renderTally(); }
@@ -1183,6 +1325,7 @@
     past = [];
     analysis.marks.length = moves.length;
     render(state.last);
+    keepGame();
     analysisRun();
   }
 
@@ -1200,6 +1343,7 @@
 
   function leaveRoom() {
     if (net) { net.close(); net = null; }
+    roomCode = "";
     setupBox.hidden = false;
     liveBox.hidden = true;
     chatEl.hidden = true;
@@ -1226,7 +1370,20 @@
     joinInput.value = tidy;            /* show what was actually read */
     var session = startSession();
     showRoom(tidy);
+    roomCode = tidy;
+    /* Put the room in the address. A phone that reloads the page — and they
+       do, on their own, when a tab has been away a while — then comes back
+       into the same room instead of to an empty board. */
+    try { history.replaceState(null, "", location.pathname + "?room=" + tidy); }
+    catch (e) {}
     reset(false);
+    /* Coming back to the same room — after a reload, a lost connection, or a
+       phone that put the page to sleep — carries on the game that was there. */
+    var saved = savedGame(tidy);
+    if (saved) {
+      restore(saved);
+      say("note", "Your game is where you left it.");
+    }
     session.join(tidy).then(function () {
       showRoom(session.code);
       render();
@@ -1311,7 +1468,7 @@
       status: netStatus,
       open: function () {
         say("note", "Connected by hand.");
-        if (net.role === "host") broadcast(); else net.send({ t: "hello" });
+        if (net.role === "host") broadcast(); else net.send(record("hello"));
         chatReady();
         render();
       },
@@ -1502,7 +1659,7 @@
     });
     newBtn.addEventListener("click", function () {
       if (mode === "online" && net && net.connected()) {
-        if (net.role === "host") { swapSides(); reset(); }
+        if (net.role === "host") { swapSides(); newGame(); }
         else net.send({ t: "rematch" });
         return;
       }

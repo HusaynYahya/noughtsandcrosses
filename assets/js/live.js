@@ -95,7 +95,7 @@
   function live(handlers) {
     var h = handlers || {};
     var client = null, topic = null, key = null;
-    var me = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    var me = null;
     var them = null, lastHeard = 0, closed = false;
     var beat = null, watch = null, opened = false;
 
@@ -108,6 +108,7 @@
       join: function (rawCode) {
         api.code = String(rawCode || "").trim();
         if (!api.code) return Promise.reject(new Error("There is no room code here."));
+        me = whoWeAre(api.code);
         say("Joining…");
         return loadMqtt().then(function (mqtt) {
           return secrets(api.code).then(function (s) {
@@ -204,6 +205,22 @@
     }
 
     function hello() { api.send({ t: "here", id: me }); }
+
+    /* Who we are, kept for as long as this tab is open. Which of the two
+       plays crosses is settled by comparing these, so a page that comes back
+       under a new name would come back on the other side of the board —
+       reloading a game is not a reason to swap colours. It is per tab, so two
+       tabs on one machine are still two players. */
+    function whoWeAre(code) {
+      var slot = "unc.me." + code;
+      try {
+        var kept = sessionStorage.getItem(slot);
+        if (kept) return kept;
+      } catch (e) {}
+      var made = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      try { sessionStorage.setItem(slot, made); } catch (e) {}
+      return made;
+    }
 
     function startBeat() {
       stopBeat();

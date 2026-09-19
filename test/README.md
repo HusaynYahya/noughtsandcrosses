@@ -33,12 +33,22 @@ node test/byhand.mjs             # the same with no matchmaking service at all
 ```sh
 node test/broker.js              # a message service on ws://127.0.0.1:9004
 node test/livetest.mjs           # two browsers, same code, a game between them
+node test/recover.mjs            # and a game that survives losing the connection
 ```
 
 `livetest.mjs` is the one that matters for live play: it opens the same link in
 two separate browsers at the same moment and checks they connect, that a move
 and a message cross, and that twenty more moves leave both boards identical.
 It also shows what the service sees — an opaque topic and sealed blobs.
+
+`recover.mjs` is the one that matters for a connection that misbehaves, which
+is every connection eventually. Six moves in, it cuts the guest's network until
+both sides have given the other up, then brings it back; reloads the guest's
+tab; and finally wipes everything the referee knows and reloads it, which used
+to empty both boards. After each of the three the game has to still be there,
+on both sides, with the same board and the same sides. It then checks that
+**New game** still empties both boards and that the game before does not come
+back to haunt it.
 
 ```sh
 node test/turnserver.js          # a relay on 127.0.0.1:3478 (gamer/letmein)

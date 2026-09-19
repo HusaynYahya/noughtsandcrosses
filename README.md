@@ -77,6 +77,27 @@ browsers are introduced by you passing two blocks of text between them, with
 no service at all. And if live play is not worth the trouble, there is
 [playing by message](#playing-a-friend-by-message), which needs nothing.
 
+### A dropped connection does not cost you the game
+
+A connection is not a safe place to keep a game, so the game is not kept
+there. Both browsers write the whole game down as it is played, under the room
+code; the room goes into the address bar, so a page that reloads itself — as
+phones do to a tab that has been away — comes back into the same room and puts
+the board back as it was. Which side you are playing is remembered with it: a
+game under way keeps the sides it started with, however the connection settles
+things afterwards.
+
+When the two find each other again, they compare notes before anything is
+overwritten. Each side's copy of the game carries a name and a length, and a
+sync that has *lost* the game is never taken as the truth: the side that still
+has it offers its copy back, and the other picks the game up where it was. A
+board that was emptied on purpose says so, so pressing **New game** cannot be
+undone by a message from the game before.
+
+`node test/recover.mjs` is the proof: it drops the line for long enough that
+both sides give up on each other, reloads a tab, and wipes everything one side
+knows — and checks the game survives all three.
+
 ## Going back over a finished game
 
 The engine keeps out of the way while you are playing. Nothing it thinks is
