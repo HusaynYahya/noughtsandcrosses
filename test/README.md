@@ -7,10 +7,15 @@ node test/engine.test.js        # the rules, and that the solver proves what it 
 ```sh
 node test/bymessage.mjs          # two isolated browsers, codes passed by hand
 node test/bymessage2.mjs         # a whole game played that way, move by move
+node test/review.mjs             # the engine and the scratchpad stay shut until the end
 ```
 
-Those two need nothing but the page itself — which is the point of the mode
-they test.
+The first two need nothing but the page itself — which is the point of the mode
+they test. `review.mjs` plays a whole game on one device and checks that
+neither the engine nor *Try a line* is anywhere to be seen while it is on, that
+both appear once it is over, and that a line tried from a position in the
+review leaves the game that was played exactly as it was. All three want a
+server on 127.0.0.1:8777 (`python3 -m http.server 8777 --bind 127.0.0.1`).
 
 The connection is harder to test honestly, because the thing most likely to
 break is not in this repository. These two run the real library and real

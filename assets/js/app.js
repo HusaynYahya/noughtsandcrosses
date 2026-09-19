@@ -111,7 +111,6 @@
       engineMoves  = $("[data-engine-moves]"),
       engineStep   = $("[data-engine-step]"),
       engineAll    = $("[data-engine-all]"),
-      commitBtn    = $("[data-explore-commit]"),
       backBtn      = $("[data-explore-back]"),
       doneBtn      = $("[data-explore-done]"),
       playControls = $("[data-play-controls]"),
@@ -178,7 +177,7 @@
      scratchpad you can push moves around on for either side. Nothing leaves
      this browser until a move is committed, and anything arriving from the
      other player waits until you are finished. */
-  var explore = { on: false, base: null, baseMoves: [], baseTurn: X, from: 0 };
+  var explore = { on: false, base: null, baseMoves: [], from: 0 };
 
   /* Going back over a finished game. `at` is how many moves are on the board;
      the full record stays in `moves` so the list can show all of it. The
@@ -337,7 +336,7 @@
 
   function reviewLeave() {
     if (!review.on) return;
-    if (explore.on) exploreLeave(null);
+    if (explore.on) exploreLeave();
     review.on = false;
     review.done = false;
     review.scores = [];
@@ -349,7 +348,7 @@
 
   function reviewGo(n) {
     if (!review.on) return;
-    if (explore.on) exploreLeave(null);
+    if (explore.on) exploreLeave();
     review.at = Math.max(0, Math.min(moves.length, n));
     state = positionAt(review.at);
     render();
@@ -407,7 +406,7 @@
     if (!reviewBox.hidden) {
       reviewTitle.textContent = review.on ? "Going back over the game" : "The game is over";
       reviewIntro.textContent = review.on
-        ? "Step through with the arrows under the moves, or click any move in the list."
+        ? "Step through with the arrows under the moves, or click any move in the list. From any position you can try a line of your own."
         : "Step through the moves, or have the engine go over the whole game.";
       reviewGoBtn.disabled = review.running;
       reviewGoBtn.textContent = review.running ? "Reading…"
@@ -483,49 +482,40 @@
   }
 
   /* ---- trying a line --------------------------------------------------- */
+  /* Only offered once the game is finished. The line branches from whatever
+     position the review is standing on; the game itself is untouched. */
   function exploreEnter() {
-    if (explore.on || state.over) return;
+    if (explore.on || !review.on || state.over) return;
     stopThinking();
     explore.on = true;
     explore.base = E.pack(state);
     explore.baseMoves = moves.slice();
-    explore.baseTurn = state.turn;
-    explore.from = moves.length;
+    explore.from = review.at;
+    moves = moves.slice(0, review.at);
     render();
     analysisRun();
   }
 
-  /* put the real game back; `keep` is a move to play for real afterwards */
-  function exploreLeave(keep) {
+  /* put the game that was played back */
+  function exploreLeave() {
     if (!explore.on) return;
     state = E.unpack(explore.base);
     moves = explore.baseMoves.slice();
     explore.on = false;
-    analysis.marks.length = moves.length;
     analysis.standing = null;
     analysis.pending = null;
     render();
-
-    /* anything the other player sent while we were away */
-    if (keep != null && E.isLegal(state, keep)) { play(keep); return; }
     analysisRun();
-    /* thinking was stopped on the way in; set it going again */
-    if (mode === "computer" && !state.over && state.turn !== mySide) computerTurn();
   }
 
   function exploreBack() {
     if (!explore.on || moves.length <= explore.from) return;
     var replay = moves.slice(explore.from, moves.length - 1);
     state = E.unpack(explore.base);
-    moves = explore.baseMoves.slice();
+    moves = explore.baseMoves.slice(0, explore.from);
     replay.forEach(function (m) { moves.push(m); E.apply(state, m); });
     render();
     analysisRun();
-  }
-
-  function exploreCommit() {
-    if (!explore.on || moves.length <= explore.from) return;
-    exploreLeave(moves[explore.from]);
   }
 
   /* a move played while trying a line: either side, no clock, nothing sent */
@@ -534,17 +524,6 @@
     E.apply(state, move);
     render(move);
     analysisRun();
-  }
-
-  /* could the first move of this line actually be played now? */
-  function exploreCanCommit() {
-    if (!explore.on || moves.length <= explore.from) return false;
-    var first = moves[explore.from];
-    var real = E.unpack(explore.base);
-    if (!E.isLegal(real, first)) return false;
-    if (mode === "computer") return explore.baseTurn === mySide && !cancelThinking;
-    if (mode === "online") return !!(net && net.connected()) && explore.baseTurn === seat;
-    return true;
   }
 
   /* The line the engine expects from the position now on the board. Each move
@@ -583,14 +562,17 @@
 
   function renderExplore() {
     var n = moves.length - explore.from;
-    exploreStart.hidden = explore.on;
+    /* while a game is on there is nothing to try: the control belongs to the
+       look back afterwards, along with the engine */
+    exploreStart.hidden = !review.on || explore.on;
     exploreBox.hidden = !explore.on;
     playControls.hidden = explore.on;
     undoBtn.hidden = review.on || mode === "post";
-    exploreBtn.textContent = review.on ? "Try a line from here…" : "Try a line…";
     exploreFlag.hidden = !explore.on;
     boardEl.classList.toggle("ubk--exploring", explore.on);
-    exploreBtn.disabled = state.over || (mode === "online" && !(net && net.connected()));
+    exploreBtn.disabled = state.over;
+    exploreBtn.title = state.over
+      ? "Step back to a position in the game first" : "";
     if (!explore.on) return;
 
     exploreCount.textContent = n === 0 ? "Nothing played yet."
@@ -598,8 +580,6 @@
       : n + " moves in, starting " + notate(moves[explore.from]) + ".";
     backBtn.disabled = n === 0;
     renderEngineLine();
-    commitBtn.disabled = !exploreCanCommit();
-    commitBtn.textContent = n ? "Play " + notate(moves[explore.from]) : "Play it";
   }
 
   /* ---- the analysis board ---------------------------------------------- */
@@ -611,6 +591,9 @@
     /* The engine is only ever consulted once a game is over — never while one
        is being played, whether against the computer or a friend. */
     if (!review.on) { analysis.busy = false; renderAnalysis(); return; }
+    /* the reading that is on screen belongs to the position that was on the
+       board a moment ago; drop it rather than offer a line from somewhere else */
+    analysis.report = null;
     analysis.busy = true;
     renderAnalysis();
     var forState = E.clone(state);
@@ -725,7 +708,7 @@
     if (clock.running && clock.left[clock.running] <= 0 && mayFlag() &&
         (explore.on || !state.over)) {
       /* the real game is what runs out, not the line being tried */
-      if (explore.on) exploreLeave(null);
+      if (explore.on) exploreLeave();
       if (state.over) { renderClocks(); return; }
       var loser = clock.running;
       clock.flagged = loser;
@@ -878,7 +861,7 @@
     for (var i = 0; i < moves.length; i += 2) {
       var no = (i / 2) + 1;
       var isVar = explore.on && i >= explore.from;
-      var here = review.on ? review.at - 1 : moves.length - 1;
+      var here = review.on && !explore.on ? review.at - 1 : moves.length - 1;
       html += '<div class="mv' + (isVar ? " mv--var" : "") + '"><span class="mv__no">' + no + '</span>' +
               '<span class="mv__x' + (i === here ? " mv__now" : "") +
               (isVar ? " mv__var" : "") + '"' + (review.on ? ' data-at="' + (i + 1) + '"' : "") + '>' +
@@ -1157,7 +1140,7 @@
     /* Anything that moves the real game on ends the line being tried — better
        than leaving a scratchpad standing on a position that no longer is. */
     if (explore.on && (msg.t === "sync" || msg.t === "move" || msg.t === "rematch")) {
-      exploreLeave(null);
+      exploreLeave();
       say("note", "Your friend moved, so the line you were trying is gone.");
     }
     if (msg.t === "chat") {
@@ -1528,8 +1511,7 @@
     undoBtn.addEventListener("click", undo);
     exploreBtn.addEventListener("click", exploreEnter);
     backBtn.addEventListener("click", exploreBack);
-    commitBtn.addEventListener("click", exploreCommit);
-    doneBtn.addEventListener("click", function () { exploreLeave(null); });
+    doneBtn.addEventListener("click", exploreLeave);
     engineStep.addEventListener("click", function () { playEngineLine(0); });
     engineAll.addEventListener("click", function () { playEngineLine(99); });
     engineMoves.addEventListener("click", function (ev) {
@@ -1544,7 +1526,7 @@
         if (ev.key === "Home") { ev.preventDefault(); reviewGo(0); return; }
         if (ev.key === "End") { ev.preventDefault(); reviewGo(moves.length); return; }
       }
-      if (ev.key === "Escape" && explore.on) { exploreLeave(null); }
+      if (ev.key === "Escape" && explore.on) { exploreLeave(); }
       if (ev.key === "Backspace" && explore.on && ev.target === document.body) {
         ev.preventDefault();
         exploreBack();

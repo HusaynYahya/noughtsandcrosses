@@ -77,35 +77,25 @@ browsers are introduced by you passing two blocks of text between them, with
 no service at all. And if live play is not worth the trouble, there is
 [playing by message](#playing-a-friend-by-message), which needs nothing.
 
-## Trying a line before you commit
-
-**Try a line…** turns the board into a scratchpad. Play moves for both sides,
-as far ahead as you like, and see how it would go; a banner and a green frame
-make sure you never mistake it for the real game. **Back** takes one move off,
-**Done** puts the position back exactly as it was, and **Play it** plays the
-first move of your line for real.
-
-Nothing is sent anywhere while you are trying a line: the computer does not
-reply to it, and an online opponent sees none of it. Your clock keeps running,
-because you are still thinking. If your opponent moves while you are mid-line,
-the line is dropped and you are told why — better than leaving a scratchpad
-standing on a position that no longer exists.
-
-With the analysis board switched on, it reads each position in the line as you
-play it, so you can see what the engine makes of where you are heading.
-
 ## Going back over a finished game
 
 The engine keeps out of the way while you are playing. Nothing it thinks is
 shown during a game — against the computer, against a friend, or across the
-table — so there is nothing to lean on and nothing to accuse anybody of.
+table — and neither is the scratchpad, so there is nothing to lean on and
+nothing to accuse anybody of. Both belong to afterwards.
 
 When the game ends, the review opens. Step through the moves with the arrows,
 the left and right arrow keys, or by clicking any move in the list; the board
 follows. At each position the engine says how it stood, what it would have
-played, and the line it expected. **Try a line from here** branches off into
-your own variation, with the engine's suggestion beside it to play out a move
-at a time or all at once.
+played, and the line it expected.
+
+**Try a line from here…** turns the board into a scratchpad standing on the
+position you are looking at. Play moves for both sides, as far ahead as you
+like, and see how it would have gone; a banner and a green frame make sure you
+never mistake it for the game that was played. The engine's own suggestion sits
+beside it, to play out a move at a time or all at once, and it reads each
+position of your line as you go. **Back** takes one move off, **Done** puts the
+game back exactly as it was — the moves that were played are never touched.
 
 **Analyse the game** goes over every position in turn and marks the moves:
 **?!** an inaccuracy, **?** a mistake, **??** a blunder, judged by what the
