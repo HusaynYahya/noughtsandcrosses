@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="The rating table: you and everybody you have played, strongest first." />
+<meta name="theme-color" content="#161512" />
+<title>Leaderboard · Ultimate Noughts and Crosses</title>
+<link rel="stylesheet" href="assets/css/site.css?v=28" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
+</head>
+<body data-page="board">
+<main class="page" id="main">
+  <div class="page__head">
+    <h1>Leaderboard</h1>
+    <p>You and everybody you have played, strongest first. There is no server
+       behind this site, so this is your own circle rather than a world ladder:
+       each browser keeps its own book, and two people who play each other write
+       the same result into both. <a href="#how">How the rating works.</a></p>
+  </div>
+
+  <div class="tiles" data-tiles></div>
+
+  <section class="card card--flush" style="margin-top:.9rem">
+    <div class="card__head" style="padding:1rem 1rem 0">
+      <h2>The table</h2>
+      <span class="quiet" style="font-size:.76rem" data-live-note></span>
+    </div>
+    <div class="scroll">
+      <table class="tbl">
+        <thead><tr>
+          <th class="num">#</th><th>Player</th><th class="num">Rating</th>
+          <th class="num">Games</th><th class="num">W</th><th class="num">D</th>
+          <th class="num">L</th><th class="num">Score</th><th>Last seen</th>
+        </tr></thead>
+        <tbody data-table></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:.9rem" id="how">
+    <div class="card__head"><h2>How the rating works</h2></div>
+    <p>Ordinary Elo, the chess one. Everybody starts at 1200. After a rated game
+       your rating moves by <b>K × (what you scored − what you were expected to
+       score)</b>, where the expectation comes from the gap between the two
+       ratings: 400 points is ten-to-one odds. K is 40 while a rating is new,
+       24 once it has settled, and 16 above 2100 — big steps to find your level,
+       small ones to keep it.</p>
+    <p>Both browsers run the same arithmetic on the same two numbers, so the two
+       sides agree without anybody being asked. Games against the engine, across
+       one table, or by message are kept but not rated, and a game abandoned in
+       the first few moves does not count.</p>
+    <p class="netline">Nobody can vouch for a rating here but the browser that
+       keeps it. It is a record between people who play each other, not a
+       ranking anybody polices.</p>
+  </section>
+</main>
+
+<script src="assets/js/player.js?v=28"></script>
+<script src="assets/js/archive.js?v=28"></script>
+<script src="assets/js/site.js?v=28"></script>
+<script src="assets/js/live.js?v=28"></script>
+<script src="assets/js/lobby.js?v=28"></script>
+<script src="assets/js/leaderboard.js?v=28" defer></script>
+</body>
+</html>

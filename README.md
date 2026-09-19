@@ -4,8 +4,63 @@ Nine small boards inside one big one. The square you take decides which board
 your opponent has to play in next. Win three small boards in a row to win the
 game.
 
-Play it three ways: two people at one device, against the computer, or in a
-private online room with a friend.
+Play a stranger from the lobby, a friend in a private room, the engine that
+taught itself, or somebody sitting next to you. Games are rated, kept, and can
+be gone over move by move afterwards.
+
+**There is no server.** Every page here is a static file; the whole site works
+by two browsers reaching out to a public message service and talking through
+it. That buys real live play and real matchmaking with nothing to run and
+nothing to pay for — and it sets one honest limit, which the
+[leaderboard](#the-leaderboard-and-what-a-rating-means-here) section spells out.
+
+## The pages
+
+| Page | What it is for |
+| --- | --- |
+| `index.html` | The lobby: who is waiting for a game, offer one, open a private room, your last games |
+| `play.html` | The board, the clock, the chat, the move list and the review |
+| `leaderboard.html` | The rating table — you and everybody you have played |
+| `games.html` | Every game you have finished, openable on the board again |
+| `profile.html` | Your rating drawn game by game, your record, and your name |
+| `learn.html` | The rules, the notation, and what to aim for |
+| `paper.html`, `progress.html` | How the engine taught itself, written up, with the training charts |
+
+## Finding a game
+
+Press **Find an opponent** on the front page. If somebody is already waiting,
+you are put straight into their room; if nobody is, you are put on the board
+with your offer standing in the lobby until somebody takes it.
+
+The lobby is one public topic on the same message service the games run over.
+While you are waiting, it carries your name, your rating, the clock you asked
+for and the room code — that is what lets a stranger walk in. Nothing else of
+yours goes near it: **private rooms never appear in the lobby**, they have their
+own hashed topic and their own key, and you are only in the lobby while a page
+of yours is open on it.
+
+## The leaderboard, and what a rating means here
+
+Ratings are ordinary chess Elo. Everybody starts at 1200; after a rated game
+your rating moves by `K × (what you scored − what you were expected to score)`,
+with K at 40 while a rating is new, 24 once it has settled and 16 above 2100.
+Both browsers run the same arithmetic on the same two numbers, so the two sides
+agree without anybody being asked, and the points one player gains are exactly
+the points the other loses.
+
+What no server means, said plainly: **the table is your own circle, not a world
+ladder.** Each browser keeps its own book. Two people who play each other write
+the same result into both books, so what you see of somebody you have played is
+real — but nobody polices it, a rating cannot be proved to a third party, and
+clearing your site data starts you at 1200 again. Games against the engine, by
+message, or across one table are kept but never rated.
+
+## Your record
+
+Every finished game is written down here: the moves, who it was against, how it
+ended and what it did to your rating. The games page can put any of them back
+on the board with the engine's review, and can copy the lot out as text — it is
+your record, and it should not be trapped in one browser.
 
 ## The rules
 
@@ -150,11 +205,19 @@ network, and that the computer takes a win when one is on offer.
 
 | File | What it does |
 | --- | --- |
-| `index.html` | The page |
-| `assets/css/game.css` | All the styling; the design tokens are at the top |
+| `index.html` … `learn.html` | The pages, one file each |
+| `assets/css/site.css` | The design tokens, the chrome and the shared pieces — retune the site here |
+| `assets/css/game.css` | The board and the things beside it |
 | `assets/js/engine.js` | The rules. No DOM, no network |
 | `assets/js/ai.js` | The search: Monte-Carlo tree search, in slices |
 | `assets/js/analysis.js` | The analysis board: reading the search tree |
-| `assets/js/net.js` | Private rooms, peer to peer |
-| `assets/js/app.js` | Drawing the board and wiring the controls |
+| `assets/js/live.js` | Live play: reaching out to a message service |
+| `assets/js/lobby.js` | The lobby: presence and open offers on one public topic |
+| `assets/js/net.js` | Private rooms by hand, and the word codes |
+| `assets/js/player.js` | Who you are, and the Elo arithmetic |
+| `assets/js/archive.js` | Every game you have finished |
+| `assets/js/site.js` | The header and foot, and the small shared helpers |
+| `assets/js/app.js` | The board page: drawing it and wiring the controls |
+| `assets/js/home.js`, `leaderboard.js`, `games.js`, `profile.js` | A page each |
 | `test/engine.test.js` | Rules tests |
+| `test/pages.mjs`, `test/matchmaking.mjs` | Every page opens; a game found in the lobby, played and rated |

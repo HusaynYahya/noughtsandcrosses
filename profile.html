@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Your rating, your record and everybody you have played." />
+<meta name="theme-color" content="#161512" />
+<title>Profile · Ultimate Noughts and Crosses</title>
+<link rel="stylesheet" href="assets/css/site.css?v=28" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
+</head>
+<body data-page="profile">
+<main class="page" id="main">
+
+  <div class="profile__head" data-head></div>
+
+  <div class="tiles" style="margin-top:1rem" data-tiles></div>
+
+  <div class="cols cols--2" style="margin-top:.9rem">
+    <section class="card">
+      <div class="card__head">
+        <h2>Rating, game by game</h2>
+        <span class="quiet" style="font-size:.76rem" data-rating-range></span>
+      </div>
+      <figure class="fig" data-rating-fig>
+        <div class="fig__plot" data-rating></div>
+        <figcaption class="fig__cap" data-rating-cap>Rated games only. Hover a point for the game.</figcaption>
+      </figure>
+    </section>
+
+    <section class="card">
+      <div class="card__head"><h2>Games a day, last thirty</h2></div>
+      <figure class="fig">
+        <div class="fig__plot" data-activity></div>
+        <figcaption class="fig__cap">Every game, rated or not.</figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <div class="cols cols--2" style="margin-top:.9rem">
+    <section class="card card--flush">
+      <div class="card__head" style="padding:1rem 1rem 0"><h2>People you have played</h2></div>
+      <div class="scroll"><table class="tbl">
+        <thead><tr><th>Player</th><th class="num">Rating</th><th class="num">Games</th>
+          <th>Head to head</th><th>Last</th></tr></thead>
+        <tbody data-rivals></tbody>
+      </table></div>
+      <p class="empty" data-rivals-empty hidden>Nobody yet. The lobby is on the
+        <a href="index.html">front page</a>.</p>
+    </section>
+
+    <section class="card">
+      <div class="card__head"><h2>Your name here</h2></div>
+      <p>This is the name and rating other players see when you meet them. It lives
+         in this browser only — clearing your site data starts you again at 1200.</p>
+      <label class="lbl" for="name">Name</label>
+      <div class="row-join">
+        <input id="name" type="text" data-name maxlength="20" autocomplete="off" />
+        <button class="btn" type="button" data-save>Save</button>
+      </div>
+      <p class="netline" data-said></p>
+      <div class="row-btn" style="margin-top:.8rem">
+        <button class="btn btn--slim" type="button" data-forget>Start again from scratch</button>
+      </div>
+    </section>
+  </div>
+
+</main>
+
+<script src="assets/js/player.js?v=28"></script>
+<script src="assets/js/archive.js?v=28"></script>
+<script src="assets/js/site.js?v=28"></script>
+<script src="assets/js/profile.js?v=28" defer></script>
+</body>
+</html>

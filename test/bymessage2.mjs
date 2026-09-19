@@ -5,7 +5,7 @@ const A = await (await b.newContext({ viewport: { width: 1200, height: 950 } }))
 const B = await (await b.newContext({ viewport: { width: 1200, height: 950 } })).newPage();
 for (const q of [A, B]) {
   q.on('pageerror', e => errs.push(e.message));
-  await q.goto('http://127.0.0.1:8777/index.html');
+  await q.goto('http://127.0.0.1:8777/play.html');
   await q.selectOption('[data-mode]', 'post');
 }
 // a whole game, passing codes back and forth like messages

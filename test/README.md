@@ -5,6 +5,14 @@ node test/engine.test.js        # the rules, and that the solver proves what it 
 ```
 
 ```sh
+node test/pages.mjs              # every page opens, with the chrome and no errors
+node test/matchmaking.mjs        # the lobby: offered, taken, played, rated, filed
+```
+
+Those two want the local message service below as well as the web server, since
+the lobby is carried on it.
+
+```sh
 node test/bymessage.mjs          # two isolated browsers, codes passed by hand
 node test/bymessage2.mjs         # a whole game played that way, move by move
 node test/review.mjs             # the engine and the scratchpad stay shut until the end
@@ -40,6 +48,12 @@ node test/recover.mjs            # and a game that survives losing the connectio
 two separate browsers at the same moment and checks they connect, that a move
 and a message cross, and that twenty more moves leave both boards identical.
 It also shows what the service sees — an opaque topic and sealed blobs.
+
+`matchmaking.mjs` is the one that matters for the site around the board: two
+browsers with their own players, one offering a game in the lobby and the other
+taking it off the list, then a whole game played and checked at both ends — the
+same result written down twice, the ratings moved opposite ways by the same
+number of points, and the finished game openable again on the board.
 
 `recover.mjs` is the one that matters for a connection that misbehaves, which
 is every connection eventually. Six moves in, it cuts the guest's network until

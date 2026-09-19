@@ -7,7 +7,7 @@ const two = await b.newContext({ viewport: { width: 1200, height: 950 } });
 const A = await one.newPage(), B = await two.newPage();
 for (const q of [A, B]) q.on('pageerror', e => errs.push(e.message));
 for (const q of [A, B]) {
-  await q.goto('http://127.0.0.1:8777/index.html');
+  await q.goto('http://127.0.0.1:8777/play.html');
   await q.selectOption('[data-mode]', 'post');
   await q.waitForTimeout(200);
 }
@@ -44,7 +44,7 @@ console.log('sides kept straight: A is', (await A.textContent('[data-seat-note="
             '| B is', (await B.textContent('[data-seat-note="home"]')).trim());
 
 // a link instead of a code
-const link = 'http://127.0.0.1:8777/index.html?game=' + code2;
+const link = 'http://127.0.0.1:8777/play.html?game=' + code2;
 const C = await (await b.newContext()).newPage();
 await C.goto(link);
 await C.waitForTimeout(600);

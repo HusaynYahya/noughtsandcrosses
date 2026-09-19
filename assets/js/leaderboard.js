@@ -1,0 +1,61 @@
+/* ============================================================================
+   ULTIMATE NOUGHTS AND CROSSES — the rating table
+   ----------------------------------------------------------------------------
+   Everybody this browser knows about: you, everybody you have played, and
+   anybody standing in the lobby right now. The lobby is joined only to mark
+   who is online — nothing is posted on your behalf by opening this page.
+   ============================================================================ */
+(function () {
+  "use strict";
+  var S = window.UNC.site, P = window.UNC.player, A = window.UNC.archive;
+  var online = {};
+
+  function draw() {
+    var rows = P.table();
+    var me = rows.filter(function (r) { return r.you; })[0];
+    var sum = A.summary();
+
+    document.querySelector("[data-tiles]").innerHTML =
+      tile(me.rating + (me.provisional ? "?" : ""), "your rating",
+           me.provisional ? (P.PROVISIONAL - me.games) + " rated games to settle it" : "") +
+      tile("#" + me.place, "of " + S.plural(rows.length, "player")) +
+      tile(sum.rate + "%", "your score", sum.wins + " won, " + sum.draws + " drawn") +
+      tile(Object.keys(online).length, "online now", "in the lobby");
+
+    document.querySelector("[data-table]").innerHTML = rows.map(function (r) {
+      var here = online[r.id] || r.you;
+      return "<tr" + (r.you ? ' class="you"' : "") + ">" +
+        '<td class="num quiet">' + r.place + "</td>" +
+        '<td><span class="name"><span class="dot ' + (here ? "dot--on" : "dot--off") +
+          '"></span>' + S.face(r) + S.esc(r.name) +
+          (r.you ? '<span class="tag">you</span>' : "") + "</span></td>" +
+        '<td class="num">' + r.rating + (r.provisional ? "?" : "") + "</td>" +
+        '<td class="num">' + r.games + "</td>" +
+        '<td class="num w">' + r.wins + "</td>" +
+        '<td class="num d">' + r.draws + "</td>" +
+        '<td class="num l">' + r.losses + "</td>" +
+        '<td class="num">' + (r.games ? Math.round((r.wins + r.draws / 2) / r.games * 100) + "%" : "—") + "</td>" +
+        '<td class="quiet">' + S.esc(here ? "now" : S.ago(r.last || r.seen)) + "</td></tr>";
+    }).join("");
+  }
+
+  function tile(n, k, sub) {
+    return '<div class="tile"><span class="tile__n">' + S.esc(n) + "</span>" +
+           '<span class="tile__k">' + S.esc(k) + "</span>" +
+           (sub ? '<span class="tile__sub">' + S.esc(sub) + "</span>" : "") + "</div>";
+  }
+
+  S.ready(function () {
+    draw();
+    var note = document.querySelector("[data-live-note]");
+    var lobby = window.UNC.lobby.join({
+      list: function (seeks, count) {
+        online = {};
+        lobby.everyone().forEach(function (w) { online[w.id] = true; });
+        note.textContent = count ? S.plural(count, "player") + " in the lobby" : "";
+        draw();
+      },
+      status: function (text, kind) { if (kind === "error") note.textContent = text; }
+    });
+  });
+})();

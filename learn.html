@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="The rules of ultimate noughts and crosses, the notation, and what to aim for once you know them." />
+<meta name="theme-color" content="#161512" />
+<title>Learn · Ultimate Noughts and Crosses</title>
+<link rel="stylesheet" href="assets/css/site.css?v=28" />
+<link rel="stylesheet" href="assets/css/learn.css?v=28" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
+</head>
+<body data-page="learn">
+<main class="page" id="main">
+  <div class="page__head">
+    <h1>How it works</h1>
+    <p>Nine small boards laid out as one big one. Everything follows from a
+       single rule: the square you play in decides which board your opponent
+       must play in next.</p>
+  </div>
+
+  <div class="cols cols--side">
+    <div class="stack">
+
+      <section class="card">
+        <div class="card__head"><h2>The one rule</h2></div>
+        <div class="learn__split">
+          <div>
+            <p>Look at where a move lands <em>inside</em> its small board. Top
+               right of that small board sends your opponent to the top right
+               small board of the big one. Middle sends them to the middle. That
+               is the whole game.</p>
+            <p>So every move is two decisions at once: what it does on the board
+               you are in, and where it sends the other player next. A move that
+               wins a small board and hands your opponent a dead one is worth
+               more than either on its own.</p>
+          </div>
+          <svg viewBox="0 0 220 120" class="diagram" role="img"
+               aria-label="A cross played in the top-right square of a small board sends the next move to the top-right board of the big one.">
+            <g class="diagram__grid">
+              <rect x="6" y="14" width="92" height="92" rx="1"/>
+              <path d="M36.7 14v92M67.3 14v92M6 44.7h92M6 75.3h92"/>
+              <rect x="122" y="14" width="92" height="92" rx="1"/>
+              <path d="M152.7 14v92M183.3 14v92M122 44.7h92M122 75.3h92"/>
+            </g>
+            <rect class="diagram__here" x="67.3" y="14" width="30.6" height="30.6"/>
+            <g class="diagram__mark">
+              <path d="M77.6 24.3l10 10M87.6 24.3l-10 10"/>
+            </g>
+            <rect class="diagram__there" x="183.3" y="14" width="30.6" height="30.6"/>
+            <path class="diagram__arrow" d="M101 27c7-4 12-5 17-5" marker-end="url(#tip)"/>
+            <defs><marker id="tip" viewBox="0 0 10 10" refX="8" refY="5"
+              markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M0 0l10 5-10 5z" fill="currentColor"/></marker></defs>
+            <text class="diagram__label" x="52" y="118" text-anchor="middle">a square in a small board</text>
+            <text class="diagram__label" x="168" y="118" text-anchor="middle">the board they must play in</text>
+          </svg>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h2>Winning</h2></div>
+        <ul class="learn__list">
+          <li>Three in a row inside a small board <b>wins that small board</b> for you.</li>
+          <li>Three small boards in a row — across, down or corner to corner —
+              <b>wins the game</b>.</li>
+          <li>A small board nobody wins counts for neither side.</li>
+          <li>If every board is settled and nobody has three in a row, the game
+              is a draw.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h2>The two rules people argue about</h2></div>
+        <p>This site plays them the way they are set out below. They are the ones
+           that differ from table to table, so it is worth knowing which you are
+           playing.</p>
+        <ul class="learn__list">
+          <li><b>A won board is still played in.</b> If you are sent to a board
+              somebody has already won, and it still has empty squares, you play
+              there as normal. The result of that board never changes — it belongs
+              to whoever won it first — but the square you take still decides
+              where your opponent goes next. It is the sharpest rule in the game:
+              a won board is a corridor you can steer people through.</li>
+          <li><b>Only a full board sets you free.</b> You may play anywhere only
+              when the board you were sent to has no empty squares at all. Not
+              when it is won — when it is <em>full</em>.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h2>Reading the moves</h2></div>
+        <p>Moves are written the way chess writes squares: files <b>a</b> to
+           <b>i</b> across, ranks <b>1</b> to <b>9</b> up. The whole big board is
+           one nine by nine grid, so <b>e5</b> is the middle square of the middle
+           board and <b>a9</b> is the far top left corner.</p>
+        <p>The move list beside the board uses it, the engine's lines use it, and
+           you can read a game back from the list alone.</p>
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h2>What to aim for</h2></div>
+        <ul class="learn__list">
+          <li><b>Think about where you are sending them, first.</b> A good square
+              in a board you are losing is usually worse than a poor square that
+              sends your opponent somewhere useless.</li>
+          <li><b>The centre board is worth more.</b> It is in four of the eight
+              winning lines. So are the corners, in three.</li>
+          <li><b>Full boards are the free move.</b> Sending your opponent to a
+              full board hands them a free choice of the whole grid. Sending them
+              to a board where every square is bad for them is the opposite.</li>
+          <li><b>Set up two threats at once.</b> As in ordinary noughts and
+              crosses, one threat is answered and two is a win — but here the
+              threats are whole small boards.</li>
+          <li><b>Read the engine afterwards.</b> When a game ends, the review
+              opens: step through it and press <em>Analyse the game</em> to see
+              where a position turned, and try your own lines from any move.</li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="stack">
+      <section class="card">
+        <div class="card__head"><h2>Start playing</h2></div>
+        <div class="row-btn">
+          <a class="btn btn--go" href="index.html">Find an opponent</a>
+        </div>
+        <div class="row-btn" style="margin-top:.45rem">
+          <a class="btn" href="play.html?mode=computer">Play the engine</a>
+          <a class="btn" href="play.html?mode=local">Two people, one device</a>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card__head"><h2>The engine</h2></div>
+        <p>The engine here taught itself, by playing itself several hundred
+           thousand times and keeping what worked. It is written up in full.</p>
+        <div class="row-btn">
+          <a class="btn btn--slim" href="paper.html">The write-up</a>
+          <a class="btn btn--slim" href="progress.html">The training charts</a>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card__head"><h2>Playing with no connection</h2></div>
+        <p>If a network blocks live play, the board has a by-message mode: every
+           move produces a short code carrying the whole game. Send it however you
+           already send things, and your opponent pastes it in.</p>
+        <div class="row-btn">
+          <a class="btn btn--slim" href="play.html?mode=post">Play by message</a>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script src="assets/js/player.js?v=28"></script>
+<script src="assets/js/site.js?v=28"></script>
+</body>
+</html>

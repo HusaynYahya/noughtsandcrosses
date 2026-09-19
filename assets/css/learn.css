@@ -1,0 +1,19 @@
+/* ============================================================================
+   The rules page — prose, lists, and the one diagram worth drawing
+   ============================================================================ */
+.learn__split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 15rem); gap: 1.2rem; align-items: center; }
+@media (max-width: 640px) { .learn__split { grid-template-columns: minmax(0, 1fr); } }
+.learn__list { margin: 0; padding-left: 1.1rem; font-size: .88rem; }
+.learn__list li { margin-bottom: .55rem; }
+.learn__list li:last-child { margin-bottom: 0; }
+.learn__list b { color: var(--text-strong); font-weight: 600; }
+.card em { color: var(--text-strong); font-style: italic; }
+
+.diagram { width: 100%; height: auto; color: var(--go-hi); }
+.diagram__grid rect { fill: var(--sq-dark); stroke: var(--line-hard); stroke-width: 1.4; }
+.diagram__grid path { stroke: var(--line-hard); stroke-width: 1.4; fill: none; }
+.diagram__here { fill: var(--live); }
+.diagram__there { fill: var(--live-hi); }
+.diagram__mark path { stroke: var(--x); stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.diagram__arrow { stroke: var(--go-hi); stroke-width: 1.8; fill: none; }
+.diagram__label { fill: var(--text-dim); font-size: 8px; font-family: var(--font); }

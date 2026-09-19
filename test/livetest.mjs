@@ -10,7 +10,7 @@ const mk = async () => {
   return p;
 };
 const A = await mk(), B = await mk();
-const URL = 'http://127.0.0.1:8777/index.html?room=lantern-delta-opal-falcon#lantern-delta-opal-falcon';
+const URL = 'http://127.0.0.1:8777/play.html?room=lantern-delta-opal-falcon#lantern-delta-opal-falcon';
 const st = async (p) => (await p.textContent('[data-net-status]')).trim();
 
 console.log('— both open the same link, at the same time —');

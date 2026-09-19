@@ -76,6 +76,14 @@
      board that is empty on purpose, so a late message from the game before
      cannot put the old one back. */
   var gid = "", roomCode = "", startedHere = false;
+
+  /* The person at the other end of an online game: their name, rating and id,
+     as their own browser reports them. It is what the seat strip shows, what
+     the rating is worked out against, and what the game is filed under
+     afterwards. Nobody can vouch for it but them — see the note in the README
+     about what a rating means here. */
+  var them = null;
+  var P = window.UNC.player, ARCH = window.UNC.archive, SITE = window.UNC.site;
   function newGid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
@@ -307,7 +315,40 @@
     tally[state.winner] = (tally[state.winner] || 0) + 1;
     saveTally();
     renderTally();
+    recordGame();
   }
+
+  /* Into your record: what it was, who it was against, and what it did to
+     your rating. Only a game against a named person counts towards a rating —
+     the engine and the other side of your own table do not. */
+  function recordGame() {
+    if (!moves.length) return;
+    var mine = mode === "local" ? 0 : seatHome();
+    var score = !state.winner ? 0.5 : state.winner === mine ? 1 : 0;
+    var rated = mode === "online" && !!them && moves.length >= 6;
+    var rival = mode === "online" && them ? them : null;
+    var change = { before: Math.round(P.me().rating), after: Math.round(P.me().rating), change: 0 };
+
+    if (mode !== "local") change = P.finished(score, rival, rated);
+
+    lastResult = ARCH.add({
+      mode: mode,
+      result: score === 1 ? "win" : score === 0 ? "loss" : "draw",
+      side: mine || X,
+      ending: clock.flagged ? "time" : "board",
+      moves: E.packMoves(moves),
+      plies: moves.length,
+      opponent: rival ? { id: rival.id, name: rival.name, rating: rival.rating }
+        : { id: mode, name: mode === "computer" ? "The engine · " + level
+              : mode === "post" ? "By message" : "Across the table" },
+      rated: rated,
+      before: change.before, after: change.after, change: change.change,
+      clock: clock.on ? { mode: clock.mode, base: clock.base, inc: clock.inc,
+                          perMove: clock.perMove } : null
+    });
+    renderSeats();
+  }
+  var lastResult = null;
 
   /* ---- the computer ---------------------------------------------------- */
   function computerTurn() {
@@ -417,9 +458,12 @@
 
     if (!reviewBox.hidden) {
       reviewTitle.textContent = review.on ? "Going back over the game" : "The game is over";
-      reviewIntro.textContent = review.on
+      var rated = lastResult && lastResult.rated
+        ? (lastResult.change > 0 ? "+" : "") + lastResult.change + " · " +
+          lastResult.after + " rating. " : "";
+      reviewIntro.textContent = rated + (review.on
         ? "Step through with the arrows under the moves, or click any move in the list. From any position you can try a line of your own."
-        : "Step through the moves, or have the engine go over the whole game.";
+        : "Step through the moves, or have the engine go over the whole game.");
       reviewGoBtn.disabled = review.running;
       reviewGoBtn.textContent = review.running ? "Reading…"
         : review.done ? "Look again" : "Analyse the game";
@@ -930,13 +974,18 @@
       badge.className = "seat__badge seat__badge--" + (side === X ? "x" : "o");
       badge.innerHTML = MARK[side];
 
-      name.textContent = mine ? "You"
-        : mode === "computer" ? "Computer"
-        : mode === "online" || mode === "post" ? "Your friend"
+      var me = P.me();
+      name.textContent = mine ? me.name
+        : mode === "computer" ? "The engine"
+        : mode === "online" ? (them ? them.name : "Waiting…")
+        : mode === "post" ? "Your friend"
         : SIDE[side];
-      note.textContent = mode === "local" || (mode === "post" && !post.side)
-        ? (side === X ? "first" : "second")
-        : SIDE[side].toLowerCase() + (mode === "computer" && !mine ? " · " + level : "");
+      var rating = mine ? Math.round(me.rating) + (P.provisional(me) ? "?" : "")
+        : mode === "online" && them ? them.rating : "";
+      note.textContent = (rating ? rating + " · " : "") +
+        (mode === "local" || (mode === "post" && !post.side)
+          ? (side === X ? "first" : "second")
+          : SIDE[side].toLowerCase() + (mode === "computer" && !mine ? " · " + level : ""));
       score.textContent = boardsWon(side);
     }
   }
@@ -1108,7 +1157,7 @@
      It is what gets written down here, and what gets sent when the two sides
      have to work out between them which of them still knows the game. */
   function record(t) {
-    return { t: t, gid: gid, ply: moves.length, at: Date.now(),
+    return { t: t, gid: gid, ply: moves.length, at: Date.now(), counted: counted,
              state: E.pack(state), moves: moves.slice(), seat: seat,
              tally: tally,
              clock: { on: clock.on, mode: clock.mode, base: clock.base,
@@ -1154,7 +1203,7 @@
     moves = rec.moves.slice();
     if (rec.seat === X || rec.seat === O) seat = rec.seat;
     past = [];
-    counted = state.over;
+    counted = state.over || !!rec.counted;
     analysis.marks = [];
     analysisReset();
     if (rec.clock) {
@@ -1211,10 +1260,17 @@
         /* which of the two plays crosses was settled by the transport, the
            same way on both sides — but a game already under way keeps the
            sides it was played with, whatever the connection decides now */
-        if (!moves.length) seat = net.role === "host" ? X : O;
+        if (!moves.length) {
+          seat = net.role === "host" ? X : O;
+          /* an offer can ask for a side; the one who made the room is the one
+             who can simply take it */
+          if (net.role === "host" && wantSide === "O") seat = O;
+        }
         /* whoever answers brings their copy of the game with them, so a side
            that has lost it can be given it back */
         if (net.role === "host") broadcast(); else net.send(record("hello"));
+        net.send({ t: "who", who: P.card() });
+        dropSeek();
         say("note", "Connected.");
         chatReady();
         render();
@@ -1253,6 +1309,10 @@
     }
     if (msg.t === "chat") {
       say("them", String(msg.text || "").slice(0, 300));
+      return;
+    }
+    if (msg.t === "who") {
+      meetThem(msg.who);
       return;
     }
     if (net.role === "host") {
@@ -1321,12 +1381,36 @@
       clock.running = msg.clock.running | 0;
       clock.since = Date.now();
     }
-    counted = state.over;
     past = [];
     analysis.marks.length = moves.length;
     render(state.last);
     keepGame();
     analysisRun();
+    /* The move that ended the game may have arrived rather than been played
+       here — the referee's copy is where a guest learns it lost. Settle it the
+       same way either way, once. */
+    if (state.over && !counted) finishGame();
+    else counted = state.over;
+  }
+
+  /* Their card, as they describe themselves. Everything in it is their
+     typing, so it is cut to size here and escaped wherever it is shown. */
+  function meetThem(card) {
+    if (!card || typeof card.id !== "string") return;
+    var first = !them || them.id !== card.id;
+    them = {
+      id: String(card.id).slice(0, 40),
+      name: String(card.name || "your friend").replace(/\s+/g, " ").trim().slice(0, 20) || "your friend",
+      rating: Math.max(0, Math.min(4000, card.rating | 0)),
+      games: Math.max(0, card.games | 0)
+    };
+    P.seen(them);
+    if (first) {
+      say("note", "You are playing " + them.name + " (" + them.rating + ").");
+      net.send({ t: "who", who: P.card() });     /* so they have ours as well */
+    }
+    renderSeats();
+    render();
   }
 
   function swapSides() { seat = seat === X ? O : X; }
@@ -1343,6 +1427,8 @@
 
   function leaveRoom() {
     if (net) { net.close(); net = null; }
+    dropSeek();
+    them = null;
     roomCode = "";
     setupBox.hidden = false;
     liveBox.hidden = true;
@@ -1355,6 +1441,35 @@
       history.replaceState(null, "", location.pathname);
     }
     reset(false);
+  }
+
+  /* ---- standing in the lobby ------------------------------------------- */
+  /* A room made from the front page can be left open: while you sit in it
+     alone, the lobby carries the offer so a stranger can walk in. The moment
+     somebody does, the offer comes down. */
+  var seekOut = null, seekWanted = null, wantSide = "";
+
+  function offerSeek(room, tc, side) {
+    if (!window.UNC.lobby || seekOut) return;
+    seekWanted = { room: room, tc: tc || "0", side: side || "either" };
+    seekOut = window.UNC.lobby.join({
+      list: function () {},
+      status: function () {}
+    });
+    seekOut.post(seekWanted);
+    /* the lobby only learns of it once the connection is up */
+    var tries = setInterval(function () {
+      if (!seekOut) { clearInterval(tries); return; }
+      if (seekOut.connected()) { seekOut.post(seekWanted); clearInterval(tries); }
+    }, 1000);
+    setTimeout(function () { clearInterval(tries); }, 20000);
+  }
+
+  function dropSeek() {
+    if (!seekOut) return;
+    seekOut.close();
+    seekOut = null;
+    seekWanted = null;
   }
 
   /* A room is just a code both of you use; there is nothing to create or to
@@ -1801,6 +1916,31 @@
     }
   }
 
+  /* Any game in your record can be put back on the board and gone over with
+     the engine, exactly as if it had just finished here. */
+  function openArchived(id) {
+    var game = ARCH.get(id);
+    if (!game) {
+      netStatus("That game is not in this browser's record.", "error");
+      render();
+      return false;
+    }
+    var read = E.unpackMoves(game.moves);
+    if (!read) return false;
+    setMode("local");
+    reset(false);
+    moves = read.slice();
+    state = E.create();
+    moves.forEach(function (m) { E.apply(state, m); });
+    counted = true;
+    lastResult = game;
+    render(state.last);
+    reviewEnter();
+    say("note", "Going over your game against " +
+        (game.opponent ? game.opponent.name : "the board") + ", " + SITE.ago(game.at) + ".");
+    return true;
+  }
+
   /* ---- go -------------------------------------------------------------- */
   buildBoard();
   wire();
@@ -1812,9 +1952,29 @@
   loadTally();
   renderTally();
 
+  /* The front page hands the board its instructions in the address: which
+     kind of game, which clock, and whether the room should be left open in
+     the lobby for somebody to walk into. */
+  var asked = new URLSearchParams(location.search);
+  var wantTc = asked.get("tc");
+  if (wantTc) {
+    var option = Array.prototype.some.call(tcSel.options, function (o) { return o.value === wantTc; });
+    if (option) { tcSel.value = wantTc; clockSet(readTimeControl()); }
+  }
+  var wantMode = asked.get("mode");
+  if (wantMode === "computer" || wantMode === "local" || wantMode === "post" ||
+      wantMode === "online") {
+    setMode(wantMode);
+  }
+
+  var toReview = asked.get("review");
+
   var invited = NET.readLink(location.search, location.hash);
   var byMessage = /[?&]game=([A-Za-z0-9\-_]+)/.exec(location.search);
-  if (byMessage) {
+  if (toReview) {
+    render();
+    openArchived(toReview);
+  } else if (byMessage) {
     setMode("post");
     postIn.value = byMessage[1];
     postUse();
@@ -1822,6 +1982,11 @@
     setMode("online");
     joinInput.value = invited;
     joinRoom(invited);
+    wantSide = asked.get("side") === "O" ? "O" : asked.get("side") === "X" ? "X" : "";
+    if (asked.get("open") === "1") offerSeek(invited, wantTc || "0", wantSide || "either");
+  } else if (asked.get("host") === "1") {
+    setMode("online");
+    hostRoom();
   } else if (NET.looksLikeInvitation(location.search, location.hash)) {
     /* Something was tacked onto the address but no code could be read out of
        it. Almost always a link that lost its tail on the way — say so, rather

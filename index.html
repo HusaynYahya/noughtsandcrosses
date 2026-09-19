@@ -3,360 +3,127 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
+<meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play a stranger in the open lobby, a friend in a private room, or the engine that taught itself." />
 <meta name="theme-color" content="#161512" />
 <title>Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/game.css?v=27" />
+<link rel="stylesheet" href="assets/css/site.css?v=28" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
-<body>
-<a class="skip-link" href="#board">Skip to the board</a>
+<body data-page="home">
+<a class="skip-link" href="#main">Skip to the lobby</a>
 
-<header class="top">
-  <div class="top__inner">
-    <span class="brand">
-      <svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-        <g stroke="currentColor" stroke-width="7" fill="none">
-          <path d="M36 8v84M64 8v84M8 36h84M8 64h84" />
-        </g>
-      </svg>
-      <span class="brand__word">Ultimate noughts &amp; crosses</span>
-    </span>
-    <span class="top__tag">Nine boards inside one</span>
-  </div>
-</header>
+<main class="page" id="main">
 
-<main class="app" id="main">
-
-  <!-- ---------------------------------------------------------------- board -->
-  <div class="board-col">
-
-    <div class="seat seat--top" data-seat="away">
-      <span class="seat__badge" data-seat-badge="away"></span>
-      <span class="seat__who">
-        <b data-seat-name="away">Noughts</b>
-        <small data-seat-note="away">second</small>
-      </span>
-      <span class="seat__score" data-seat-score="away" title="Small boards won">0</span>
-      <span class="seat__clock" data-seat-clock="away" hidden>5:00</span>
+  <div class="hero">
+    <div class="hero__text">
+      <h1>Nine boards inside one</h1>
+      <p>Every move you make sends your opponent to the small board in the matching
+         square. Win three small boards in a line to win the game. Play someone
+         waiting in the lobby, invite a friend to a private room, or take on the
+         engine that taught itself.</p>
+      <div class="hero__go">
+        <button class="btn btn--go btn--big" type="button" data-quick>Find an opponent</button>
+        <a class="btn btn--big" href="play.html?mode=computer">Play the engine</a>
+        <a class="btn btn--big" href="play.html?mode=local">One device, two people</a>
+      </div>
+      <p class="netline" data-lobby-status>Reaching the lobby…</p>
     </div>
-
-    <p class="explore-flag" data-explore-flag hidden>Trying a line — none of this was played</p>
-
-    <div class="board-frame">
-      <div class="ranks" data-ranks aria-hidden="true"></div>
-      <div class="ubk" id="board" data-board role="group"
-           aria-label="Ultimate noughts and crosses board"></div>
-      <div class="files" data-files aria-hidden="true"></div>
-    </div>
-
-    <div class="seat seat--bottom" data-seat="home">
-      <span class="seat__badge" data-seat-badge="home"></span>
-      <span class="seat__who">
-        <b data-seat-name="home">Crosses</b>
-        <small data-seat-note="home">first</small>
-      </span>
-      <span class="seat__score" data-seat-score="home" title="Small boards won">0</span>
-      <span class="seat__clock" data-seat-clock="home" hidden>5:00</span>
-    </div>
-
-    <p class="status" data-status role="status" aria-live="polite">
-      <span class="status__dot" data-turn="X"></span>
-      <span data-status-text>Crosses to play — anywhere you like.</span>
-    </p>
+    <a class="hero__board" href="play.html" aria-label="Play">
+      <span class="hero__grid" data-hero aria-hidden="true"></span>
+    </a>
   </div>
 
-  <!-- -------------------------------------------------------------- sidebar -->
-  <aside class="side">
+  <div class="cols cols--side">
+    <section class="card card--flush">
+      <div class="card__head" style="padding: 1rem 1rem 0">
+        <h2>Open games <span class="dot dot--off" data-lobby-dot></span>
+          <span data-lobby-count class="quiet"></span></h2>
+        <button class="linkish" type="button" data-lobby-refresh>Offer a game</button>
+      </div>
+      <div class="scroll">
+        <table class="tbl" data-seeks-table hidden>
+          <thead><tr>
+            <th>Player</th><th class="num">Rating</th><th>Clock</th>
+            <th>Side</th><th>Waiting</th><th></th>
+          </tr></thead>
+          <tbody data-seeks></tbody>
+        </table>
+      </div>
+      <p class="empty" data-seeks-empty>Nobody is waiting for a game right now.
+        Offer one and the next person here will see it.</p>
+    </section>
 
-    <div class="side__block">
-      <label class="lbl" for="mode">Opponent</label>
-      <select id="mode" data-mode>
-        <option value="local">Two players, one device</option>
-        <option value="computer">The computer</option>
-        <option value="online">A friend online</option>
-        <option value="post">A friend, by message</option>
-      </select>
-
-      <label class="lbl lbl--spaced" for="tc">Clock</label>
-      <select id="tc" data-tc>
-        <option value="0">No clock</option>
-        <optgroup label="A bank of time each">
-          <option value="60+0">1 + 0 &nbsp;· bullet</option>
-          <option value="180+2">3 + 2 &nbsp;· blitz</option>
-          <option value="300+3">5 + 3 &nbsp;· blitz</option>
-          <option value="600+0">10 + 0 &nbsp;· rapid</option>
-          <option value="custom">Custom…</option>
-        </optgroup>
-        <optgroup label="Time for every move">
-          <option value="move:15">15 seconds a move</option>
-          <option value="move:30">30 seconds a move</option>
-          <option value="move:60">1 minute a move</option>
+    <div class="stack">
+      <section class="card">
+        <div class="card__head"><h2>Offer a game</h2></div>
+        <label class="lbl" for="seek-tc">Clock</label>
+        <select id="seek-tc" data-seek-tc>
+          <option value="0">No clock</option>
+          <option value="60+0">1 + 0 · bullet</option>
+          <option value="180+2">3 + 2 · blitz</option>
+          <option value="300+3" selected>5 + 3 · blitz</option>
+          <option value="600+0">10 + 0 · rapid</option>
           <option value="move:300">5 minutes a move</option>
-          <option value="move:custom">Custom…</option>
-        </optgroup>
-      </select>
-      <div class="row2" data-tc-custom hidden>
-        <div>
-          <label class="lbl" for="tcMin">Minutes</label>
-          <input id="tcMin" type="number" min="0" max="180" step="1" value="5" data-tc-min />
+        </select>
+        <label class="lbl lbl--spaced" for="seek-side">Your side</label>
+        <select id="seek-side" data-seek-side>
+          <option value="either" selected>Either</option>
+          <option value="X">Crosses, first</option>
+          <option value="O">Noughts, second</option>
+        </select>
+        <div class="row-btn" style="margin-top:.7rem">
+          <button class="btn btn--go" type="button" data-offer>Offer it</button>
         </div>
-        <div>
-          <label class="lbl" for="tcInc" data-tc-second-label>Increment, seconds</label>
-          <input id="tcInc" type="number" min="0" max="60" step="1" value="3" data-tc-inc />
-        </div>
-      </div>
-      <p class="tc__note" data-tc-note hidden>Every move starts with the
-        whole allowance again. Run out on one move and you lose.</p>
+        <p class="netline">Your name and rating are shown in the lobby while you are
+          waiting. Private rooms never appear here.</p>
+      </section>
 
-      <div data-only="computer" hidden>
-        <div class="row2">
-          <div>
-            <label class="lbl" for="level">Strength</label>
-            <select id="level" data-level>
-              <option value="gentle">Gentle</option>
-              <option value="steady" selected>Steady</option>
-              <option value="ruthless">Ruthless</option>
-            </select>
-          </div>
-          <div>
-            <label class="lbl" for="side">You play</label>
-            <select id="side" data-side>
-              <option value="1">Crosses</option>
-              <option value="2">Noughts</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div data-only="post" hidden>
-        <p class="post__note">No connection of any kind. You make a move, the page
-          gives you a short code, you send it however you send anything. They
-          paste it, move, and send one back. The code carries the whole game, so
-          it cannot get out of step.</p>
-
-        <div data-post-send hidden>
-          <span class="lbl">Send this</span>
-          <textarea class="byhand__box" data-post-out readonly rows="2"></textarea>
-          <div class="row-btn">
-            <button class="btn btn--slim btn--go" type="button" data-post-copy>Copy the code</button>
-            <button class="btn btn--slim" type="button" data-post-copy-link>Copy a link</button>
-          </div>
-        </div>
-
-        <span class="lbl lbl--spaced">Their code</span>
-        <textarea class="byhand__box" data-post-in rows="2"
-                  placeholder="paste what they sent you"></textarea>
+      <section class="card">
+        <div class="card__head"><h2>Play a friend</h2></div>
+        <p>Make a code, send it however you like, and you are in a private room
+           nobody else can see.</p>
         <div class="row-btn">
-          <button class="btn btn--slim" type="button" data-post-use>Use it</button>
+          <a class="btn btn--go" href="play.html?mode=online&amp;host=1">Make a room</a>
         </div>
-        <p class="post__said" data-post-said></p>
-      </div>
+        <label class="lbl lbl--spaced" for="join">Or join with a code</label>
+        <form class="row-join" data-join-form>
+          <input id="join" type="text" data-join-code placeholder="four words" autocomplete="off" />
+          <button class="btn" type="submit">Go</button>
+        </form>
+      </section>
 
-      <div data-only="online" hidden>
-        <div data-room-setup>
-          <button class="btn btn--go" type="button" data-host>Make a code</button>
-          <p class="hairline">or use one you were given</p>
-          <div class="row-join">
-            <input type="text" data-join-code inputmode="latin" autocomplete="off"
-                   spellcheck="false" placeholder="four-word code" aria-label="Room code" />
-            <button class="btn" type="button" data-join>Join</button>
-          </div>
-        </div>
-        <div data-room-live hidden>
-          <p class="code" data-room-code></p>
-          <div class="row-btn">
-            <button class="btn" type="button" data-copy>Copy invitation</button>
-            <button class="btn btn--quiet" type="button" data-leave>Leave</button>
-          </div>
-        </div>
-        <p class="netline" data-net-status></p>
-        <p class="netline">Whoever arrives first holds the room open, so it does
-          not matter which of you opens the link. You do both need it open at the
-          same time.
-          <button class="linkish" type="button" data-net-check>Not working? Check the connection</button>
-        </p>
-        <ul class="netcheck" data-net-check-out hidden></ul>
-        <div class="row-btn" data-net-report hidden>
-          <button class="btn btn--slim" type="button" data-net-copy>Copy this report</button>
-        </div>
-
-        <details class="byhand" data-byhand>
-          <summary>Rooms not working? Connect by hand</summary>
-          <p class="byhand__note">This needs no matchmaking service at all — just
-            a way to send each other two blocks of text. One of you starts.</p>
-          <div class="row-btn">
-            <button class="btn btn--slim" type="button" data-hand-start>I'll start</button>
-            <button class="btn btn--slim" type="button" data-hand-join>They started</button>
-          </div>
-
-          <div class="relaybox">
-            <span class="lbl">A relay of your own</span>
-            <p class="byhand__note">Free public relays come and go, and without
-              one a lot of mobile and office networks cannot be joined at all.
-              A free account at <b>metered.ca</b> (or any TURN server) gives you
-              three lines to paste here. Both of you only need one between you.</p>
-            <input type="text" data-relay-url placeholder="turn:your-relay:443" />
-            <div class="row2">
-              <input type="text" data-relay-user placeholder="username" />
-              <input type="text" data-relay-pass placeholder="password" />
-            </div>
-            <div class="row-btn">
-              <button class="btn btn--slim" type="button" data-relay-save>Use this relay</button>
-              <button class="btn btn--slim btn--go" type="button" data-relay-test>Test it</button>
-              <button class="btn btn--slim" type="button" data-relay-clear>Forget it</button>
-            </div>
-            <p class="byhand__note" data-relay-said></p>
-          </div>
-
-          <div data-hand-step hidden>
-            <p class="byhand__step" data-hand-say></p>
-            <textarea class="byhand__box" data-hand-out readonly hidden rows="3"></textarea>
-            <div class="row-btn" data-hand-out-row hidden>
-              <button class="btn btn--slim" type="button" data-hand-copy>Copy this code</button>
-            </div>
-            <textarea class="byhand__box" data-hand-in placeholder="paste their code here"
-                      rows="3" hidden></textarea>
-            <div class="row-btn" data-hand-in-row hidden>
-              <button class="btn btn--slim btn--go" type="button" data-hand-go>Use it</button>
-            </div>
-          </div>
-        </details>
-      </div>
+      <section class="card" data-you>
+        <div class="card__head"><h2>You</h2><a href="profile.html">Profile</a></div>
+        <div data-you-body></div>
+      </section>
     </div>
+  </div>
 
-    <div class="side__block review" data-review hidden>
-      <span class="lbl" data-review-title>The game is over</span>
-      <p class="review__intro" data-review-intro>Step through the moves below, or
-        have the engine go over the whole game.</p>
-      <div class="row-btn">
-        <button class="btn btn--go" type="button" data-review-analyse>Analyse the game</button>
+  <div class="cols cols--2" style="margin-top:.9rem">
+    <section class="card card--flush">
+      <div class="card__head" style="padding:1rem 1rem 0">
+        <h2>Your last games</h2><a href="games.html">All games</a>
       </div>
-      <p class="review__progress" data-review-progress hidden></p>
-      <div class="evalgraph" data-evalgraph hidden></div>
-      <p class="review__summary" data-review-summary hidden></p>
+      <div class="scroll"><table class="tbl"><tbody data-recent></tbody></table></div>
+      <p class="empty" data-recent-empty hidden>No games yet. The first one is above.</p>
+    </section>
 
-      <div data-an-body hidden>
-        <div class="evalbar" data-eval-bar>
-          <span class="evalbar__x" data-eval-fill style="width:50%"></span>
-        </div>
-        <p class="an__eval"><b data-eval-text>Even</b></p>
-        <p class="an__row">Best move <b data-an-best>—</b></p>
-        <p class="an__row an__pv">Likely line <span data-an-pv>—</span></p>
-        <p class="an__row an__cands-head">Choices for <b data-an-side>crosses</b></p>
-        <ul class="an__cands" data-an-cands></ul>
-        <p class="an__key">
-          <span class="mv__mark mv__mark--dubious">?!</span> inaccuracy
-          <span class="mv__mark mv__mark--mistake">?</span> mistake
-          <span class="mv__mark mv__mark--blunder">??</span> blunder
-        </p>
+    <section class="card card--flush">
+      <div class="card__head" style="padding:1rem 1rem 0">
+        <h2>Leaderboard</h2><a href="leaderboard.html">The whole table</a>
       </div>
-    </div>
+      <div class="scroll"><table class="tbl"><tbody data-top></tbody></table></div>
+    </section>
+  </div>
 
-    <div class="side__block side__block--flush">
-      <div class="moves" data-moves role="log" aria-label="Moves played">
-        <p class="moves__empty">The moves will appear here.</p>
-      </div>
-      <div class="moves-nav" data-moves-nav hidden>
-        <button class="navb" type="button" data-nav="start" aria-label="First move">|◀</button>
-        <button class="navb" type="button" data-nav="prev" aria-label="Previous move">◀</button>
-        <span class="moves-nav__at" data-nav-label>0 / 0</span>
-        <button class="navb" type="button" data-nav="next" aria-label="Next move">▶</button>
-        <button class="navb" type="button" data-nav="end" aria-label="Last move">▶|</button>
-      </div>
-    </div>
-
-    <div class="side__block">
-      <div class="row-btn" data-play-controls>
-        <button class="btn btn--go" type="button" data-new>New game</button>
-        <button class="btn" type="button" data-undo>Take back</button>
-      </div>
-      <div class="row-btn" data-explore-start hidden>
-        <button class="btn" type="button" data-explore>Try a line from here…</button>
-      </div>
-
-      <div data-explore-controls hidden>
-        <p class="explore__head">
-          <b>Trying a line.</b>
-          <span data-explore-count>Nothing played yet.</span>
-          Play moves for either side; the game that was played stays as it was.
-        </p>
-        <div class="engine-line" data-engine-line hidden>
-          <span class="lbl">The engine expects</span>
-          <p class="engine-line__moves" data-engine-moves></p>
-          <div class="row-btn">
-            <button class="btn btn--slim" type="button" data-engine-step>Next move</button>
-            <button class="btn btn--slim" type="button" data-engine-all>Play the line</button>
-          </div>
-        </div>
-
-        <div class="row-btn">
-          <button class="btn" type="button" data-explore-back disabled>Back</button>
-          <button class="btn btn--go" type="button" data-explore-done>Done</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="side__block">
-      <span class="lbl">The overall game</span>
-      <div class="overall-wrap">
-        <div class="overall" data-overall aria-hidden="true"></div>
-        <p class="overall__count" data-overall-count role="status" aria-live="polite">
-          Nine boards still to win.
-        </p>
-      </div>
-      <dl class="tally" aria-label="Games won">
-        <div><dt>Crosses</dt><dd data-tally-x>0</dd></div>
-        <div><dt>Noughts</dt><dd data-tally-o>0</dd></div>
-        <div><dt>Drawn</dt><dd data-tally-d>0</dd></div>
-      </dl>
-    </div>
-
-    <div class="side__block chat" data-chat hidden>
-      <span class="lbl">Chat</span>
-      <div class="chat__log" data-chat-log role="log" aria-live="polite" aria-label="Messages"></div>
-      <form class="chat__form" data-chat-form>
-        <input type="text" data-chat-input maxlength="300" autocomplete="off"
-               placeholder="Say something" aria-label="Your message" />
-        <button class="btn" type="submit" data-chat-send>Send</button>
-      </form>
-    </div>
-
-    <details class="rules side__block">
-      <summary>The rules</summary>
-      <ol>
-        <li>Nine small boards sit in one big three-by-three.</li>
-        <li>The <b>square</b> you play in a small board sends your opponent to the
-          <b>small board in that position</b>. Take the top-right square, and they
-          must play in the top-right board.</li>
-        <li>A small board that has already been won is <b>still played in</b> while it
-          has empty squares — but its result never changes. It belongs to whoever
-          won it first.</li>
-        <li>Only when the board you are sent to is <b>completely full</b> may you
-          play wherever you like.</li>
-        <li>A small board that fills up with no line belongs to nobody.</li>
-        <li>Win <b>three small boards in a row</b> to win the game. If every square
-          is filled and nobody has three in a row, the game is drawn.</li>
-      </ol>
-      <p class="rules__note">Squares are named as on a chessboard: files <b>a–i</b>
-        left to right, ranks <b>1–9</b> bottom to top.</p>
-    </details>
-
-    <p class="fineprint">Online games are peer to peer. Moves and messages travel
-      straight between the two browsers and are never stored.<br />
-      The computer's opinions were learned from its own games:
-      <a href="paper.html">how that works</a> ·
-      <a href="progress.html">the charts</a>.</p>
-  </aside>
 </main>
 
-<script src="assets/js/engine.js?v=27"></script>
-<script src="assets/js/features.js?v=27"></script>
-<script src="assets/js/weights.js?v=27"></script>
-<script src="assets/js/ai.js?v=27"></script>
-<script src="assets/js/analysis.js?v=27"></script>
-<script src="assets/js/live.js?v=27"></script>
-<script src="assets/js/net.js?v=27"></script>
-<script src="assets/js/app.js?v=27" defer></script>
+<script src="assets/js/player.js?v=28"></script>
+<script src="assets/js/archive.js?v=28"></script>
+<script src="assets/js/site.js?v=28"></script>
+<script src="assets/js/net.js?v=28"></script>
+<script src="assets/js/live.js?v=28"></script>
+<script src="assets/js/lobby.js?v=28"></script>
+<script src="assets/js/home.js?v=28" defer></script>
 </body>
 </html>

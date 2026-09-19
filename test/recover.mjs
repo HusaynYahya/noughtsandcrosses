@@ -14,7 +14,7 @@ const mk = async () => {
 };
 const A = await mk(), B = await mk();
 const CODE = 'harbour-ember-cedar-raven';
-const URL = 'http://127.0.0.1:8777/index.html?room=' + CODE + '#' + CODE;
+const URL = 'http://127.0.0.1:8777/play.html?room=' + CODE + '#' + CODE;
 
 const st = (p) => p.textContent('[data-net-status]').then(t => t.trim());
 const marks = (p) => p.locator('.cell--x, .cell--o').count();
@@ -39,8 +39,9 @@ say('both connected', await settle(A, B));
 const sides = { A: await side(A), B: await side(B) };
 say('sides', 'A is ' + sides.A + ', B is ' + sides.B);
 
-/* the host is whoever has crosses at the start */
-const host = sides.A === 'crosses' ? A : B;
+/* the host is whoever has crosses at the start (the seat note now carries a
+   rating as well, so match on the word) */
+const host = sides.A.indexOf('crosses') >= 0 ? A : B;
 const guest = host === A ? B : A;
 const name = (p) => (p === A ? 'A' : 'B');
 say('the referee is', name(host));

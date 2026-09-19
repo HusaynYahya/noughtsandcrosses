@@ -7,7 +7,7 @@ const A = await ctx.newPage(), B = await ctx.newPage();
 for (const q of [A, B]) q.on('pageerror', e => errs.push(e.message));
 // no matchmaking service pointed at, and no fake transport: real WebRTC only
 for (const q of [A, B]) {
-  await q.goto('http://127.0.0.1:8777/index.html');
+  await q.goto('http://127.0.0.1:8777/play.html');
   await q.selectOption('[data-mode]', 'online');
   await q.click('.byhand summary');
 }

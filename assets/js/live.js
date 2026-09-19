@@ -317,4 +317,8 @@
   root.UNC = root.UNC || {};
   root.UNC.live = live;
   root.UNC.live.check = check;
+  /* the lobby reaches the same services the same way; no point having two
+     copies of the loader or two lists of addresses */
+  root.UNC.live.load = loadMqtt;
+  root.UNC.live.brokers = function () { return (root.UNC_BROKERS || BROKERS).slice(); };
 })(typeof window !== "undefined" ? window : globalThis);

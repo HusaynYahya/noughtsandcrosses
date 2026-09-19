@@ -7,7 +7,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-119
 const p = await (await b.newContext({ viewport: { width: 1200, height: 950 } })).newPage();
 const errs = [];
 p.on('pageerror', e => errs.push(e.message));
-await p.goto('http://127.0.0.1:8777/index.html');
+await p.goto('http://127.0.0.1:8777/play.html');
 await p.selectOption('[data-mode]', 'local');
 await p.waitForTimeout(200);
 

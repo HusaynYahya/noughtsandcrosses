@@ -8,7 +8,7 @@ for (const [label, user, pass, expect] of [
   ['wrong password',   'gamer', 'nope',    'should fail']]) {
   const ctx = await b.newContext({ viewport: { width: 1200, height: 950 } });
   const p = await ctx.newPage();
-  await p.goto('http://127.0.0.1:8777/index.html');
+  await p.goto('http://127.0.0.1:8777/play.html');
   await p.selectOption('[data-mode]', 'online');
   await p.click('.byhand summary');
   await p.fill('[data-relay-url]', 'turn:127.0.0.1:3478');
@@ -32,7 +32,7 @@ const A = await ctx.newPage(), B = await ctx.newPage();
 const errs = [];
 for (const q of [A, B]) {
   q.on('pageerror', e => errs.push(e.message));
-  await q.goto('http://127.0.0.1:8777/index.html');
+  await q.goto('http://127.0.0.1:8777/play.html');
   await q.selectOption('[data-mode]', 'online');
   await q.click('.byhand summary');
 }
