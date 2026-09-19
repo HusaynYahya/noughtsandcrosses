@@ -59,6 +59,13 @@ ciphertext.
 The connection library is kept in this repository and served alongside the
 game, so a blocked or unreachable CDN cannot stop a room opening.
 
+**On a phone, keep the page open.** Switching to another app pauses it, and a
+paused page cannot answer the door — which is what happens if you open the
+link, then switch to your messages to send it. The page picks the connection
+back up the moment you look at it again, and the other side keeps knocking
+meanwhile, so it recovers on its own; but the two of you will meet faster if
+the link is sent from somewhere else, or sent first and opened after.
+
 **If a room will not open**, there is a *Check the connection* link under the
 room controls. It tries the three things a private game needs — the library,
 the matchmaking service, and whether this network lets two browsers reach each

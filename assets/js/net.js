@@ -153,6 +153,37 @@
     var h = handlers || {};
     var peer = null, conn = null, closed = false;
     var beat = null, watch = null, lastHeard = 0;
+    var wanted = null;            /* the code we are trying to be in a room at */
+    var meeting = false;          /* a meeting is already under way */
+
+    /* A phone pauses a page the moment you switch apps — to send the link, as
+       often as not. The line to the matchmaking service dies with it, while
+       the room address stays claimed for a while longer, so a friend arriving
+       finds a room that is there but will not answer. Nothing here recovered
+       from that: the page came back and simply sat. So every peer is watched,
+       and a page returning from the background picks the line back up. */
+    function watchLine(p) {
+      p.on("disconnected", function () {
+        if (closed || p.destroyed) return;
+        say("The line to the service dropped — picking it back up…");
+        revive(p, 0);
+      });
+    }
+
+    function revive(p, n) {
+      if (closed || !p || p.destroyed) return;
+      try { p.reconnect(); } catch (e) {}
+      setTimeout(function () {
+        if (closed || !p || p.destroyed) return;
+        if (p.disconnected) { revive(p, n + 1); return; }
+        say(conn && conn.open ? "Connected."
+          : api.role === "host" ? "Back. Waiting for your friend to join."
+          : "Back. Knocking again…");
+        if (!(conn && conn.open) && api.role === "guest" && wanted && !meeting) {
+          api.meet(wanted);
+        }
+      }, Math.min(1500 + n * 1500, 10000));
+    }
 
     function startBeat() {
       lastHeard = Date.now();
@@ -220,6 +251,7 @@
           var settled = false;
           var p = new Peer(PREFIX + code, PEER_OPTS);
           peer = p;
+          watchLine(p);
           p.on("open", function () { if (!settled) { settled = true; done(true); } });
           p.on("connection", function (c) {
             if (conn && conn.open) { c.close(); return; }      /* a room is for two */
@@ -245,6 +277,7 @@
           var attempts = 0, timer = null, settled = false;
           var p = new Peer(PEER_OPTS);
           peer = p;
+          watchLine(p);
 
           p.on("open", function () { go(); });
           p.on("error", function (err) {
@@ -336,8 +369,12 @@
         var code = tidyCode(rawCode);
         if (!code) return Promise.reject(new Error("That link has no room code in it."));
         api.code = code;
+        wanted = code;
+        if (meeting) return Promise.resolve(code);   /* one at a time */
+        meeting = true;
         say("Looking for the room…");
-        return attempt(0);
+        return attempt(0).then(function (c) { meeting = false; return c; },
+                              function (e) { meeting = false; throw e; });
 
         function attempt(n) {
           if (closed) return Promise.resolve(code);
@@ -345,21 +382,29 @@
           return claim(code).then(function (mine) {
             if (mine) {
               api.role = "host";
-              say("Waiting for your friend to join. Keep this page open.");
+              say("Waiting for your friend to join. Keep this page open — on a " +
+                  "phone, switching to another app pauses it.");
               return code;                       /* and hold it, without fidgeting */
             }
             api.role = "guest";
             say("Your friend is there — knocking…");
             return knock(code, TRIES).then(function (ok) {
               if (ok) return code;
-              /* They were there a moment ago and are not answering: most
-                 likely they closed the page and the service has not let go of
-                 their address yet. Wait for it to lapse, then take the room. */
-              if (n >= 4) throw notThere(code);
-              say("No answer. Waiting for their address to lapse, then taking " +
-                  "the room over…");
-              return new Promise(function (go) { setTimeout(go, 4000); })
-                .then(function () { return attempt(n + 1); });
+              /* The address is claimed but nobody answers. Usually their page
+                 is paused in the background — a phone does that the moment you
+                 switch apps — and it will answer again the moment they look at
+                 it. So keep knocking rather than giving up, and say what would
+                 help. Eventually the stale address lapses and the room can be
+                 taken over instead. */
+              if (closed) return code;
+              say(n < 2
+                ? "Their room is there but not answering. If their page is in the " +
+                  "background, ask them to open it again — still knocking…"
+                : "Still no answer. Ask your friend to reopen the page; if they " +
+                  "have gone, this will take the room over shortly…", "waiting");
+              return new Promise(function (go) {
+                setTimeout(go, Math.min(4000 + n * 2000, 12000));
+              }).then(function () { return attempt(n + 1); });
             });
           });
         }
@@ -372,6 +417,13 @@
 
       connected: function () { return !!(conn && conn.open); },
 
+      /* Called when the page is looked at again after being in the background. */
+      wake: function () {
+        if (closed || meeting || (conn && conn.open)) return;
+        if (peer && peer.disconnected && !peer.destroyed) { revive(peer, 0); return; }
+        if (wanted) api.meet(wanted);
+      },
+
       link: function () {
         /* The code goes in the query as well as the fragment: some messaging
            apps and link wrappers drop the part after the #, and a link that
@@ -383,6 +435,7 @@
 
       close: function () {
         closed = true;
+        wanted = null;
         stopBeat();
         if (conn) { try { conn.close(); } catch (e) {} conn = null; }
         if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }

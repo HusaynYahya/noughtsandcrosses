@@ -1383,6 +1383,20 @@
     chatForm.addEventListener("submit", sendChat);
     $("[data-copy]").addEventListener("click", copyInvite);
     window.addEventListener("beforeunload", function () { if (net) net.close(); });
+
+    /* A phone pauses the page when you switch apps, which kills the line to
+       the matchmaking service. Pick it up again the moment the page is looked
+       at — this is the difference between a room that works and two people
+       staring at "waiting". */
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible" && net) net.wake();
+    });
+    /* only a page restored from the back-forward cache; a plain load is
+       already opening a room of its own */
+    window.addEventListener("pageshow", function (ev) {
+      if (ev.persisted && net) net.wake();
+    });
+    window.addEventListener("online", function () { if (net) net.wake(); });
   }
 
   function copyInvite(ev) {
