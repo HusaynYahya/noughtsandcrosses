@@ -126,6 +126,10 @@
       handIn      = $("[data-hand-in]"),
       handInRow   = $("[data-hand-in-row]"),
       handGo      = $("[data-hand-go]"),
+      relayUrl    = $("[data-relay-url]"),
+      relayUser   = $("[data-relay-user]"),
+      relayPass   = $("[data-relay-pass]"),
+      relaySaid   = $("[data-relay-said]"),
       netCopyBtn  = $("[data-net-copy]"),
       tcSel     = $("[data-tc]"),
       tcCustom  = $("[data-tc-custom]"),
@@ -1186,6 +1190,8 @@
     liveBox.hidden = false;
     chatEl.hidden = false;
     codeEl.textContent = code;
+    /* nothing to invite anybody to when the two were introduced by hand */
+    $("[data-copy]").hidden = code === "by hand";
     chatReady();
   }
 
@@ -1226,6 +1232,15 @@
       showRoom(session.code);
       render();
     }).catch(function () { /* the status line has already said so */ });
+  }
+
+  function showSavedRelay() {
+    var own = NET.savedRelay();
+    if (!own) return;
+    relayUrl.value = own.urls;
+    relayUser.value = own.username || "";
+    relayPass.value = own.credential || "";
+    relaySaid.textContent = "Using your own relay.";
   }
 
   /* ---- connecting by hand, with no service ----------------------------- */
@@ -1270,6 +1285,8 @@
                code, true, "Connect");
       showRoom("by hand");
       chatEl.hidden = false;
+      netStatus("Send them your code, then paste theirs back here. Nothing " +
+                "happens until both codes have been across.", "waiting");
       render();
     }, function (err) { netStatus(err.message, "error"); });
   }
@@ -1291,11 +1308,14 @@
                  reply, false);
         showRoom("by hand");
         chatEl.hidden = false;
+        netStatus("Now send that code back. Nothing will happen on this screen " +
+                  "until your friend has pasted it.", "waiting");
         render();
       }, function (err) { netStatus(err.message, "error"); });
     } else {
       hand.accept(text).then(function () {
         handShow("Connecting…", "", false);
+        netStatus("Both codes are across — connecting…", "waiting");
       }, function (err) { netStatus(err.message, "error"); });
     }
   }
@@ -1486,6 +1506,19 @@
     $("[data-hand-join]").addEventListener("click", handJoin);
     handGo.addEventListener("click", handUse);
     $("[data-hand-copy]").addEventListener("click", handCopy);
+    $("[data-relay-save]").addEventListener("click", function () {
+      var url = relayUrl.value.trim();
+      if (!url) { relaySaid.textContent = "Put the relay's address in first."; return; }
+      NET.setRelay(url, relayUser.value.trim(), relayPass.value.trim());
+      relaySaid.textContent = "Saved in this browser. Start the connection again to " +
+        "use it — and make sure your friend has one too, or has this same one.";
+    });
+    $("[data-relay-clear]").addEventListener("click", function () {
+      NET.setRelay(null);
+      relayUrl.value = relayUser.value = relayPass.value = "";
+      relaySaid.textContent = "Forgotten. Back to the public relays.";
+    });
+    showSavedRelay();
     chatForm.addEventListener("submit", sendChat);
     $("[data-copy]").addEventListener("click", copyInvite);
     window.addEventListener("beforeunload", function () { if (net) net.close(); });

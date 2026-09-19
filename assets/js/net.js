@@ -31,23 +31,53 @@
      The relays below are free and public. They carry the moves but cannot read
      them: a data channel is encrypted end to end, so a relay only ever handles
      ciphertext. */
-  var ICE = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-      { urls: "turn:openrelay.metered.ca:80",
-        username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:openrelay.metered.ca:443",
-        username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:openrelay.metered.ca:443?transport=tcp",
-        username: "openrelayproject", credential: "openrelayproject" }
-    ]
-  };
+  var PUBLIC_RELAYS = [
+    { urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject", credential: "openrelayproject" }
+  ];
+  var ICE = { iceServers: [] };
   /* Which matchmaking service to use. The public cloud one by default; a page
      can point somewhere else by setting UNC_PEER_SERVER before this file
      loads, which is how the connection can be tested end to end against a
      service running on the same machine — and how anybody who would rather
      not depend on a public one can run their own. */
+  /* A relay you have been given, kept in this browser. The free public ones
+     are unreliable and disappear; one of your own is the only dependable way
+     through a network that will not allow a direct connection. */
+  function savedRelay() {
+    try {
+      var raw = localStorage.getItem("unc.relay");
+      var r = raw ? JSON.parse(raw) : null;
+      return r && r.urls ? r : null;
+    } catch (e) { return null; }
+  }
+
+  function setRelay(urls, username, credential) {
+    try {
+      if (!urls) { localStorage.removeItem("unc.relay"); }
+      else {
+        localStorage.setItem("unc.relay", JSON.stringify({
+          urls: urls, username: username || "", credential: credential || ""
+        }));
+      }
+    } catch (e) {}
+    ICE.iceServers = iceList();
+  }
+
+  function iceList() {
+    var list = [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" }
+    ];
+    var own = savedRelay();
+    if (own) list.push(own);
+    return list.concat(PUBLIC_RELAYS);
+  }
+
   function peerOptions() {
     var opts = { debug: 0, config: ICE };
     var custom = root.UNC_PEER_SERVER;
@@ -60,6 +90,7 @@
     }
     return opts;
   }
+  ICE.iceServers = iceList();
   var PEER_OPTS = peerOptions();
 
   /* Words chosen to be easy to read out over the phone. */
@@ -648,14 +679,29 @@
       return new Response(stream).text().then(JSON.parse);
     }
 
+    /* Both blocks of text have to be pasted before anything can connect. Until
+       the second one has been, a connection going nowhere means nothing —
+       there is nobody at the other end yet — so it is not reported as a
+       failure. Saying "neither network will allow it" to somebody whose friend
+       simply has not pasted yet sends them off fixing the wrong thing. */
+    var swapped = false;
+
     function make() {
       pc = new (root.RTCPeerConnection || root.webkitRTCPeerConnection)(ICE);
       pc.onconnectionstatechange = function () {
-        if (closed) return;
-        if (pc.connectionState === "failed") {
-          announce("The two browsers could not reach each other. Neither network " +
-                   "would allow it, even through a relay.", "error");
+        if (closed || !pc) return;
+        var state = pc.connectionState;
+        if (state === "connected") { announce("Connected.", "live"); return; }
+        if (state !== "failed" && state !== "disconnected") return;
+        if (!swapped) {
+          announce("Waiting for your friend to paste your code. Nothing happens " +
+                   "until they do.");
+          return;
         }
+        announce("Both codes went across, but the two browsers still could not " +
+                 "reach each other. Neither network will allow a direct link, and " +
+                 "no relay answered. A relay of your own is the way through — " +
+                 "there is a box for one below.", "error");
       };
       return pc;
     }
@@ -683,7 +729,10 @@
           .then(function () { return pc.createAnswer(); })
           .then(function (d) { return pc.setLocalDescription(d); })
           .then(function () { return ready(pc); })
-          .then(function () { return pack(pc.localDescription); });
+          .then(function () {
+            swapped = true;          /* we have their code; they need ours */
+            return pack(pc.localDescription);
+          });
       },
 
       /* the starter again: take the reply */
@@ -691,6 +740,7 @@
         if (!pc) return Promise.reject(new Error("Make your code first."));
         announce("Reading their reply…");
         return unpack(code).then(function (d) {
+          swapped = true;
           return pc.setRemoteDescription({ type: d.t, sdp: d.s });
         });
       },
@@ -704,6 +754,7 @@
 
   root.UNC = root.UNC || {};
   root.UNC.net = { session: session, handshake: handshake,
+                   savedRelay: savedRelay, setRelay: setRelay,
                    makeCode: makeCode, tidyCode: tidyCode,
                    readLink: readLink, looksLikeInvitation: looksLikeInvitation,
                    diagnose: diagnose };

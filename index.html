@@ -6,7 +6,7 @@
 <meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
 <meta name="theme-color" content="#161512" />
 <title>Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/game.css?v=20" />
+<link rel="stylesheet" href="assets/css/game.css?v=21" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body>
@@ -165,6 +165,24 @@
             <button class="btn btn--slim" type="button" data-hand-join>They started</button>
           </div>
 
+          <div class="relaybox">
+            <span class="lbl">A relay of your own</span>
+            <p class="byhand__note">Free public relays come and go, and without
+              one a lot of mobile and office networks cannot be joined at all.
+              A free account at <b>metered.ca</b> (or any TURN server) gives you
+              three lines to paste here. Both of you only need one between you.</p>
+            <input type="text" data-relay-url placeholder="turn:your-relay:443" />
+            <div class="row2">
+              <input type="text" data-relay-user placeholder="username" />
+              <input type="text" data-relay-pass placeholder="password" />
+            </div>
+            <div class="row-btn">
+              <button class="btn btn--slim" type="button" data-relay-save>Use this relay</button>
+              <button class="btn btn--slim" type="button" data-relay-clear>Forget it</button>
+            </div>
+            <p class="byhand__note" data-relay-said></p>
+          </div>
+
           <div data-hand-step hidden>
             <p class="byhand__step" data-hand-say></p>
             <textarea class="byhand__box" data-hand-out readonly hidden rows="3"></textarea>
@@ -307,12 +325,12 @@
   </aside>
 </main>
 
-<script src="assets/js/engine.js?v=20"></script>
-<script src="assets/js/features.js?v=20"></script>
-<script src="assets/js/weights.js?v=20"></script>
-<script src="assets/js/ai.js?v=20"></script>
-<script src="assets/js/analysis.js?v=20"></script>
-<script src="assets/js/net.js?v=20"></script>
-<script src="assets/js/app.js?v=20" defer></script>
+<script src="assets/js/engine.js?v=21"></script>
+<script src="assets/js/features.js?v=21"></script>
+<script src="assets/js/weights.js?v=21"></script>
+<script src="assets/js/ai.js?v=21"></script>
+<script src="assets/js/analysis.js?v=21"></script>
+<script src="assets/js/net.js?v=21"></script>
+<script src="assets/js/app.js?v=21" defer></script>
 </body>
 </html>

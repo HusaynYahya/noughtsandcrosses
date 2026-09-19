@@ -66,6 +66,12 @@ back up the moment you look at it again, and the other side keeps knocking
 meanwhile, so it recovers on its own; but the two of you will meet faster if
 the link is sent from somewhere else, or sent first and opened after.
 
+**A relay of your own.** Free public relays come and go, and without one a lot
+of mobile and office networks cannot be joined at all. A free account at
+metered.ca (or any TURN server) gives you an address, a username and a
+password; there is a box for them under *Connect by hand*, and one relay
+between the two of you is enough.
+
 **If rooms will not work at all**, there is *Connect by hand* under the room
 controls, which needs no matchmaking service: one of you presses **I'll start**
 and sends the block of text it makes, the other pastes it in and sends back the
