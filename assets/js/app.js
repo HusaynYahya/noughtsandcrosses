@@ -117,6 +117,8 @@
       playControls = $("[data-play-controls]"),
       netCheckBtn = $("[data-net-check]"),
       netCheckOut = $("[data-net-check-out]"),
+      netReport   = $("[data-net-report]"),
+      netCopyBtn  = $("[data-net-copy]"),
       tcSel     = $("[data-tc]"),
       tcCustom  = $("[data-tc-custom]"),
       tcMin     = $("[data-tc-min]"),
@@ -1102,13 +1104,16 @@
       message: onMessage,
       close: function () { say("note", "Your friend has gone."); chatReady(); render(); },
       error: function () {
-        if (net && net.role === "guest" && !net.connected()) {
+        if (net && !net.connected()) {
           setupBox.hidden = false;
           liveBox.hidden = true;
           chatEl.hidden = true;
         }
         chatReady();
         render();
+        /* Work out why, without being asked: whoever is trying to help needs
+           to know which of the three things failed. */
+        if (!lastCheck) runNetCheck();
       }
     });
     return net;
@@ -1214,6 +1219,47 @@
   }
 
   /* ---- when a room will not open --------------------------------------- */
+  /* The last check's findings, kept so they can be copied out and sent to
+     somebody who can do something about them. */
+  var lastCheck = null;
+
+  function copyNetReport() {
+    if (!lastCheck) return;
+    var lines = ["Ultimate noughts and crosses — connection report",
+                 new Date().toISOString(),
+                 "code: " + (net && net.code ? net.code : "(none)") +
+                 "   role: " + (net && net.role ? net.role : "(none)") +
+                 "   connected: " + !!(net && net.connected()),
+                 "status: " + (netStatusText || "(nothing said)"),
+                 ""];
+    lastCheck.forEach(function (s) {
+      lines.push((s.ok ? "OK   " : "FAIL ") + s.name + " — " + s.detail);
+    });
+    lines.push("", navigator.userAgent);
+    var text = lines.join("\n");
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(said, fallback);
+    } else fallback();
+
+    function said() {
+      netCopyBtn.textContent = "Copied — paste it to whoever is fixing this";
+      setTimeout(function () { netCopyBtn.textContent = "Copy this report"; }, 3000);
+    }
+    function fallback() {
+      var box = document.createElement("textarea");
+      box.value = text;
+      box.style.position = "fixed";
+      box.style.opacity = "0";
+      document.body.appendChild(box);
+      box.select();
+      try { document.execCommand("copy"); said(); } catch (e) {
+        netCopyBtn.textContent = "Could not copy — read it off the screen";
+      }
+      document.body.removeChild(box);
+    }
+  }
+
   function runNetCheck() {
     netCheckBtn.disabled = true;
     netCheckBtn.textContent = "Checking…";
@@ -1226,6 +1272,8 @@
                s.detail + "</li>";
       }).join("") + (finished ? "" : '<li class="working">still checking…</li>');
       if (!finished) return;
+      lastCheck = steps;
+      netReport.hidden = false;
       netCheckBtn.disabled = false;
       netCheckBtn.textContent = "Check again";
       var bad = steps.filter(function (s) { return !s.ok; });
@@ -1330,7 +1378,8 @@
       if (ev.key === "Enter") { ev.preventDefault(); joinRoom(); }
     });
     $("[data-leave]").addEventListener("click", leaveRoom);
-    netCheckBtn.addEventListener("click", runNetCheck);
+    netCheckBtn.addEventListener("click", function () { runNetCheck(); });
+    netCopyBtn.addEventListener("click", copyNetReport);
     chatForm.addEventListener("submit", sendChat);
     $("[data-copy]").addEventListener("click", copyInvite);
     window.addEventListener("beforeunload", function () { if (net) net.close(); });

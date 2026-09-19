@@ -148,7 +148,6 @@
   var BEAT_MS = 4000, SILENCE_MS = 14000;
   var KNOCK_MS = 7000, TRIES = 4;   /* how long, and how often, to knock */
   var FIRST_KNOCK_MS = 3500;        /* a quick look before holding a room open */
-  var HOLD_MS = 9000, HOLD_JITTER = 6000;   /* how long to hold a room before looking again */
 
   function session(handlers) {
     var h = handlers || {};
@@ -320,56 +319,48 @@
         });
       },
 
-      /* Meet at a code: whoever gets there first holds the room open and the
-         other one walks in. This is what an invitation link does, so it no
-         longer matters who clicks it first — or whether both of you do. */
+      /* Meet at a code.
+
+         Claiming an address is decided by the matchmaking service and nobody
+         else: exactly one browser can hold a given one. So the whole of the
+         arrangement is "try to take the room's address":
+
+           got it   — you are the host. You hold it, and you keep holding it.
+           taken    — somebody is already there, so knock on their door.
+
+         There is deliberately no looking around first, and a host never lets
+         go to go looking. An earlier version alternated between holding a room
+         and searching for one, which left windows where nobody was holding
+         anything and two people could walk past each other indefinitely. */
       meet: function (rawCode) {
         var code = tidyCode(rawCode);
         if (!code) return Promise.reject(new Error("That link has no room code in it."));
         api.code = code;
         say("Looking for the room…");
-        return round(0);
+        return attempt(0);
 
-        /* Look for a room, and hold one open if there is none. If two people
-           arrive in the same breath they can both end up holding a room and
-           waiting for each other, so a host that nobody joins goes back and
-           looks again after a while. The waits are jittered, or the two would
-           keep missing each other in step. */
-        function round(n) {
+        function attempt(n) {
           if (closed) return Promise.resolve(code);
-          return knock(code, n === 0 ? 1 : 2).then(function (found) {
-            if (found) { api.role = "guest"; return code; }
-            api.role = "host";
-            say(n === 0 ? "Nobody there yet — holding the room open…"
-                        : "Still nobody — holding the room open again…");
-            return claim(code).then(function (mine) {
-              if (!mine) {                       /* somebody got there first */
-                api.role = "guest";
-                say("Your friend got there first — joining them…");
-                return knock(code, TRIES).then(function (ok) {
-                  if (ok) return code;
-                  throw notThere(code);
-                });
-              }
-              say("Waiting for your friend to join…");
-              return waitForCompany().then(function (joined) {
-                if (joined || closed) return code;
-                if (n >= 3) { say("Still waiting. Your friend needs this same link " +
-                                  "or code open at the same time.", "waiting"); return code; }
-                return round(n + 1);
-              });
+          /* the same address Create a room holds, so the two ways in meet */
+          return claim(code).then(function (mine) {
+            if (mine) {
+              api.role = "host";
+              say("Waiting for your friend to join. Keep this page open.");
+              return code;                       /* and hold it, without fidgeting */
+            }
+            api.role = "guest";
+            say("Your friend is there — knocking…");
+            return knock(code, TRIES).then(function (ok) {
+              if (ok) return code;
+              /* They were there a moment ago and are not answering: most
+                 likely they closed the page and the service has not let go of
+                 their address yet. Wait for it to lapse, then take the room. */
+              if (n >= 4) throw notThere(code);
+              say("No answer. Waiting for their address to lapse, then taking " +
+                  "the room over…");
+              return new Promise(function (go) { setTimeout(go, 4000); })
+                .then(function () { return attempt(n + 1); });
             });
-          });
-        }
-
-        function waitForCompany() {
-          return new Promise(function (done) {
-            var waited = 0;
-            var every = setInterval(function () {
-              waited += 500;
-              if (closed || (conn && conn.open)) { clearInterval(every); done(true); return; }
-              if (waited >= HOLD_MS + Math.random() * HOLD_JITTER) { clearInterval(every); done(false); }
-            }, 500);
           });
         }
       },
