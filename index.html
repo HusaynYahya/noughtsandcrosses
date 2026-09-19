@@ -6,7 +6,7 @@
 <meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
 <meta name="theme-color" content="#161512" />
 <title>Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/game.css?v=16" />
+<link rel="stylesheet" href="assets/css/game.css?v=17" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body>
@@ -131,7 +131,7 @@
       <div data-only="online" hidden>
         <div data-room-setup>
           <button class="btn btn--go" type="button" data-host>Create a private room</button>
-          <p class="hairline">or join one</p>
+          <p class="hairline">or meet at a code</p>
           <div class="row-join">
             <input type="text" data-join-code inputmode="latin" autocomplete="off"
                    spellcheck="false" placeholder="four-word code" aria-label="Room code" />
@@ -146,7 +146,9 @@
           </div>
         </div>
         <p class="netline" data-net-status></p>
-        <p class="netline">Both of you need the page open at the same time.
+        <p class="netline">Whoever arrives first holds the room open, so it does
+          not matter which of you opens the link. You do both need it open at the
+          same time.
           <button class="linkish" type="button" data-net-check>Not working? Check the connection</button>
         </p>
         <ul class="netcheck" data-net-check-out hidden></ul>
@@ -279,12 +281,12 @@
   </aside>
 </main>
 
-<script src="assets/js/engine.js?v=16"></script>
-<script src="assets/js/features.js?v=16"></script>
-<script src="assets/js/weights.js?v=16"></script>
-<script src="assets/js/ai.js?v=16"></script>
-<script src="assets/js/analysis.js?v=16"></script>
-<script src="assets/js/net.js?v=16"></script>
-<script src="assets/js/app.js?v=16" defer></script>
+<script src="assets/js/engine.js?v=17"></script>
+<script src="assets/js/features.js?v=17"></script>
+<script src="assets/js/weights.js?v=17"></script>
+<script src="assets/js/ai.js?v=17"></script>
+<script src="assets/js/analysis.js?v=17"></script>
+<script src="assets/js/net.js?v=17"></script>
+<script src="assets/js/app.js?v=17" defer></script>
 </body>
 </html>

@@ -33,8 +33,13 @@ looser game.
 
 One of you presses **Create a room** and gets a four-word code, such as
 `copper-kestrel-amber-quartz`. **Copy invitation** puts a link and the code on
-your clipboard to send however you like. The other person opens the link, or
-types the code into **Join**, and the game begins.
+your clipboard to send however you like.
+
+A code is a **place to meet**, not a room one of you owns. Whoever gets there
+first holds it open and the other walks in, so it does not matter which of you
+opens the link — or whether you both do. You can skip the link entirely and
+both type the same four words into **Join**; if you arrive at the same instant,
+one of you takes the room and the other is let in.
 
 Either player can press **New game** for a rematch; sides swap each time, so
 nobody keeps the advantage of going first.

@@ -1201,10 +1201,14 @@
     if (!tidy) { netStatus("Type the room code first.", "error"); return; }
     if (net) net.close();
     joinInput.value = tidy;            /* show what was actually read */
-    seat = O;
-    startSession().join(tidy).then(function () {
-      showRoom(tidy);
-    }).catch(function () { /* likewise */ });
+    var session = startSession();
+    showRoom(tidy);
+    session.meet(tidy).then(function () {
+      /* whoever got there first holds the room; the other one walks in */
+      seat = session.role === "host" ? X : O;
+      showRoom(session.code);
+      render();
+    }).catch(function () { /* the status line has already said so */ });
   }
 
   /* ---- when a room will not open --------------------------------------- */
@@ -1332,8 +1336,8 @@
 
   function copyInvite(ev) {
     var btn = ev.currentTarget;
-    var text = "Come and play ultimate noughts and crosses: " + net.link() +
-               "  (room code: " + net.code + ")";
+    var text = "Come and play ultimate noughts and crosses — open this and " +
+               "we'll meet there: " + net.link() + "  (code: " + net.code + ")";
     var said = function () {
       var old = btn.textContent;
       btn.textContent = "Copied";

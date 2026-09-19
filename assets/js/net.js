@@ -98,6 +98,8 @@
      that says so. */
   var BEAT_MS = 4000, SILENCE_MS = 14000;
   var KNOCK_MS = 7000, TRIES = 4;   /* how long, and how often, to knock */
+  var FIRST_KNOCK_MS = 3500;        /* a quick look before holding a room open */
+  var HOLD_MS = 9000, HOLD_JITTER = 6000;   /* how long to hold a room before looking again */
 
   function session(handlers) {
     var h = handlers || {};
@@ -161,83 +163,166 @@
       c.on("error", function () { /* reported through the close handler */ });
     }
 
+    /* Take the code as our own address. Resolves true if we got it, false if
+       somebody else already has it. */
+    function claim(code) {
+      return loadPeer().then(function (Peer) {
+        return new Promise(function (done, reject) {
+          if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+          var settled = false;
+          var p = new Peer(PREFIX + code, { debug: 0 });
+          peer = p;
+          p.on("open", function () { if (!settled) { settled = true; done(true); } });
+          p.on("connection", function (c) {
+            if (conn && conn.open) { c.close(); return; }      /* a room is for two */
+            wire(c);
+          });
+          p.on("error", function (err) {
+            if (err && err.type === "unavailable-id") {
+              if (!settled) { settled = true; try { p.destroy(); } catch (e) {} peer = null; done(false); }
+              return;
+            }
+            if (!settled) { settled = true; fail(err, reject); }
+          });
+        });
+      });
+    }
+
+    /* Knock on somebody else's room. Resolves true once the connection is
+       open, false after `tries` goes unanswered. */
+    function knock(code, tries) {
+      return loadPeer().then(function (Peer) {
+        return new Promise(function (done, reject) {
+          if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+          var attempts = 0, timer = null, settled = false;
+          var p = new Peer({ debug: 0 });
+          peer = p;
+
+          p.on("open", function () { go(); });
+          p.on("error", function (err) {
+            if (err && err.type === "peer-unavailable") { again(); return; }
+            if (!settled) { settled = true; fail(err, reject); }
+          });
+
+          function go() {
+            if (closed || settled) return;
+            attempts++;
+            if (attempts > 1) {
+              say("Still knocking — attempt " + attempts + " of " + tries + "…");
+            }
+            var c = p.connect(PREFIX + code, { reliable: true });
+            wire(c);
+            c.on("open", function () { if (!settled) { settled = true; clearTimeout(timer); done(true); } });
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+              if (settled || (conn && conn.open)) return;
+              try { c.close(); } catch (e) {}
+              again();
+            }, attempts === 1 && tries === 1 ? FIRST_KNOCK_MS : KNOCK_MS);
+          }
+
+          function again() {
+            if (closed || settled || (conn && conn.open)) return;
+            clearTimeout(timer);
+            if (attempts < tries) { setTimeout(go, 700); return; }
+            settled = true;
+            done(false);
+          }
+        });
+      });
+    }
+
+    function taken() { return new Error("Somebody else is already at that code."); }
+
+    function notThere(code) {
+      var why = new Error("No room called \u201c" + code + "\u201d. Check the code is " +
+        "exactly right, and that your friend still has the page open.");
+      say(why.message, "error");
+      if (h.error) h.error(why);
+      return why;
+    }
+
     var api = {
       code: null,
       role: null,
 
-      host: function () {
+      /* Open a room under a code nobody has claimed. */
+      host: function (preferred) {
         api.role = "host";
-        api.code = makeCode();
+        api.code = preferred ? tidyCode(preferred) : makeCode();
         say("Opening the room…");
-        return loadPeer().then(function (Peer) {
-          return new Promise(function (resolve, reject) {
-            peer = new Peer(PREFIX + api.code, { debug: 0 });
-            peer.on("open", function () {
-              say("Waiting for your friend to join…");
-              resolve(api.code);
-            });
-            peer.on("connection", function (c) {
-              if (conn && conn.open) { c.close(); return; }   /* room is for two */
-              wire(c);
-            });
-            peer.on("error", function (err) {
-              if (err && err.type === "unavailable-id") {
-                /* astronomically unlikely, but take a fresh code and retry */
-                api.code = makeCode();
-                peer.destroy();
-                api.host().then(resolve, reject);
-                return;
-              }
-              fail(err, reject);
-            });
-          });
+        return claim(api.code).then(function (ok) {
+          if (ok) { say("Waiting for your friend to join…"); return api.code; }
+          if (preferred) throw taken();
+          api.code = makeCode();                 /* astronomically unlikely */
+          return api.host();
         });
       },
 
+      /* Knock on a room somebody else has opened. */
       join: function (rawCode) {
         api.role = "guest";
         api.code = tidyCode(rawCode);
         if (!api.code) return Promise.reject(new Error("Type the room code first."));
         say("Looking for the room…");
-        return loadPeer().then(function (Peer) {
-          return new Promise(function (resolve, reject) {
-            var tries = 0, timer = null;
-
-            peer = new Peer({ debug: 0 });
-            peer.on("open", function () { knock(); resolve(api.code); });
-            peer.on("error", function (err) {
-              /* The room not being registered yet is worth another knock —
-                 the broker can take a moment to catch up with a new room. */
-              if (err && err.type === "peer-unavailable") { again(); return; }
-              fail(err, reject);
-            });
-
-            function knock() {
-              if (closed) return;
-              tries++;
-              say(tries === 1 ? "Knocking on the room door…"
-                              : "Still knocking — attempt " + tries + " of " + TRIES + "…");
-              var c = peer.connect(PREFIX + api.code, { reliable: true });
-              wire(c);
-              clearTimeout(timer);
-              timer = setTimeout(function () {
-                if (closed || (conn && conn.open)) return;
-                try { c.close(); } catch (e) {}
-                again();
-              }, KNOCK_MS);
-            }
-
-            function again() {
-              if (closed || (conn && conn.open)) return;
-              clearTimeout(timer);
-              if (tries < TRIES) { setTimeout(knock, 900); return; }
-              var why = new Error("No room called \u201c" + api.code + "\u201d. Check the " +
-                "code is exactly right, and that your friend still has the page open.");
-              say(why.message, "error");
-              if (h.error) h.error(why);
-            }
-          });
+        return knock(api.code, TRIES).then(function (ok) {
+          if (ok) return api.code;
+          throw notThere(api.code);
         });
+      },
+
+      /* Meet at a code: whoever gets there first holds the room open and the
+         other one walks in. This is what an invitation link does, so it no
+         longer matters who clicks it first — or whether both of you do. */
+      meet: function (rawCode) {
+        var code = tidyCode(rawCode);
+        if (!code) return Promise.reject(new Error("That link has no room code in it."));
+        api.code = code;
+        say("Looking for the room…");
+        return round(0);
+
+        /* Look for a room, and hold one open if there is none. If two people
+           arrive in the same breath they can both end up holding a room and
+           waiting for each other, so a host that nobody joins goes back and
+           looks again after a while. The waits are jittered, or the two would
+           keep missing each other in step. */
+        function round(n) {
+          if (closed) return Promise.resolve(code);
+          return knock(code, n === 0 ? 1 : 2).then(function (found) {
+            if (found) { api.role = "guest"; return code; }
+            api.role = "host";
+            say(n === 0 ? "Nobody there yet — holding the room open…"
+                        : "Still nobody — holding the room open again…");
+            return claim(code).then(function (mine) {
+              if (!mine) {                       /* somebody got there first */
+                api.role = "guest";
+                say("Your friend got there first — joining them…");
+                return knock(code, TRIES).then(function (ok) {
+                  if (ok) return code;
+                  throw notThere(code);
+                });
+              }
+              say("Waiting for your friend to join…");
+              return waitForCompany().then(function (joined) {
+                if (joined || closed) return code;
+                if (n >= 3) { say("Still waiting. Your friend needs this same link " +
+                                  "or code open at the same time.", "waiting"); return code; }
+                return round(n + 1);
+              });
+            });
+          });
+        }
+
+        function waitForCompany() {
+          return new Promise(function (done) {
+            var waited = 0;
+            var every = setInterval(function () {
+              waited += 500;
+              if (closed || (conn && conn.open)) { clearInterval(every); done(true); return; }
+              if (waited >= HOLD_MS + Math.random() * HOLD_JITTER) { clearInterval(every); done(false); }
+            }, 500);
+          });
+        }
       },
 
       send: function (msg) {
