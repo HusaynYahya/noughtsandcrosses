@@ -130,6 +130,10 @@
       relayUser   = $("[data-relay-user]"),
       relayPass   = $("[data-relay-pass]"),
       relaySaid   = $("[data-relay-said]"),
+      postSend    = $("[data-post-send]"),
+      postOut     = $("[data-post-out]"),
+      postIn      = $("[data-post-in]"),
+      postSaid    = $("[data-post-said]"),
       netCopyBtn  = $("[data-net-copy]"),
       tcSel     = $("[data-tc]"),
       tcCustom  = $("[data-tc-custom]"),
@@ -180,6 +184,12 @@
      the full record stays in `moves` so the list can show all of it. The
      engine is only ever consulted here — never while a game is being played. */
   var review = { on: false, at: 0, full: null, scores: [], done: false, running: false };
+
+  /* Playing by message: no connection of any kind. Each move produces a code
+     carrying the whole game, which is sent by whatever the two of you already
+     use to send each other things. `side` is which of the two you are, settled
+     by the first thing you do. */
+  var post = { side: null };
 
   function buildBoard() {
     var frag = document.createDocumentFragment();
@@ -239,6 +249,7 @@
     if (review.on) return false;          /* the game is over: this is a look back */
     if (mode === "computer") return state.turn === mySide && !cancelThinking;
     if (mode === "online") return net && net.connected() && state.turn === seat;
+    if (mode === "post") return post.side ? state.turn === post.side : true;
     return true;
   }
 
@@ -258,9 +269,11 @@
       return;
     }
 
+    if (mode === "post" && !post.side) post.side = state.turn;
     advance(move);
     if (mode === "online") broadcast();
     else if (mode === "computer") computerTurn();
+    else if (mode === "post") renderPost();
   }
 
   function advance(move) {
@@ -573,7 +586,7 @@
     exploreStart.hidden = explore.on;
     exploreBox.hidden = !explore.on;
     playControls.hidden = explore.on;
-    undoBtn.hidden = review.on;
+    undoBtn.hidden = review.on || mode === "post";
     exploreBtn.textContent = review.on ? "Try a line from here…" : "Try a line…";
     exploreFlag.hidden = !explore.on;
     boardEl.classList.toggle("ubk--exploring", explore.on);
@@ -754,7 +767,10 @@
   }
 
   function seatHome() {
-    return mode === "online" ? seat : (mode === "computer" ? mySide : X);
+    if (mode === "online") return seat;
+    if (mode === "computer") return mySide;
+    if (mode === "post") return post.side || X;
+    return X;
   }
 
   /* what the controls are asking for, in milliseconds */
@@ -842,6 +858,7 @@
     renderSeats();
     renderExplore();
     renderReview();
+    renderPost();
     renderClocks();
     renderAnalysis();
     boardEl.classList.toggle("is-thinking", !!cancelThinking);
@@ -896,7 +913,7 @@
 
   /* The two player strips, above and below the board. */
   function renderSeats() {
-    var home = mode === "online" ? seat : (mode === "computer" ? mySide : X);
+    var home = seatHome();
     var away = home === X ? O : X;
     fill("home", home);
     fill("away", away);
@@ -907,7 +924,7 @@
       var name = document.querySelector('[data-seat-name="' + where + '"]');
       var note = document.querySelector('[data-seat-note="' + where + '"]');
       var score = document.querySelector('[data-seat-score="' + where + '"]');
-      var mine = where === "home" && mode !== "local";
+      var mine = where === "home" && mode !== "local" && !(mode === "post" && !post.side);
 
       var cls = "seat seat--" + (where === "home" ? "bottom" : "top");
       if (!state.over && state.turn === side) cls += " seat--on";
@@ -919,9 +936,10 @@
 
       name.textContent = mine ? "You"
         : mode === "computer" ? "Computer"
-        : mode === "online" ? "Your friend"
+        : mode === "online" || mode === "post" ? "Your friend"
         : SIDE[side];
-      note.textContent = mode === "local" ? (side === X ? "first" : "second")
+      note.textContent = mode === "local" || (mode === "post" && !post.side)
+        ? (side === X ? "first" : "second")
         : SIDE[side].toLowerCase() + (mode === "computer" && !mine ? " · " + level : "");
       score.textContent = boardsWon(side);
     }
@@ -1243,6 +1261,66 @@
     relaySaid.textContent = "Using your own relay.";
   }
 
+  /* ---- playing by message ---------------------------------------------- */
+  function postLink(code) {
+    return location.origin + location.pathname + "?game=" + code;
+  }
+
+  function renderPost() {
+    if (mode !== "post") { postSend.hidden = true; return; }
+    var mine = post.side && state.turn !== post.side && !state.over;
+    var ended = state.over && moves.length;
+    postSend.hidden = !(mine || ended);
+    if (postSend.hidden) return;
+    postOut.value = E.packMoves(moves);
+  }
+
+  function postUse() {
+    var text = postIn.value.trim();
+    if (!text) return;
+    var read = E.unpackMoves(text.replace(/^.*[?&]game=/, ""));
+    if (!read) {
+      postSaid.textContent = "That is not a game code — check it came across whole.";
+      postSaid.className = "post__said post__said--bad";
+      return;
+    }
+    if (read.length < moves.length) {
+      postSaid.textContent = "That code is from earlier in the game than where you are.";
+      postSaid.className = "post__said post__said--bad";
+      return;
+    }
+    stopThinking();
+    state = E.create();
+    moves = read.slice();
+    past = [];
+    counted = false;
+    analysis.marks = [];
+    read.forEach(function (m) { E.apply(state, m); });
+    /* whoever receives a code is the one to move next */
+    post.side = state.over ? post.side : state.turn;
+    postIn.value = "";
+    postSaid.textContent = state.over ? "That is the end of the game."
+      : "Their move is on the board. Yours now.";
+    postSaid.className = "post__said post__said--good";
+    render(state.last);
+    if (state.over) finishGame();
+  }
+
+  function copyText(btn, text, said) {
+    var done = function () {
+      var old = btn.textContent;
+      btn.textContent = said || "Copied";
+      setTimeout(function () { btn.textContent = old; }, 1800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { btn.textContent = "Copy it by hand"; });
+    } else {
+      postOut.value = text;
+      postOut.select();
+      try { document.execCommand("copy"); done(); } catch (e) { btn.textContent = "Copy it by hand"; }
+    }
+  }
+
   /* ---- connecting by hand, with no service ----------------------------- */
   var hand = null, handRole = null, handStage = null;
 
@@ -1424,6 +1502,7 @@
   function setMode(next) {
     if (next === mode) return;
     stopThinking();
+    post.side = null;
     if (mode === "online") leaveRoom();
     mode = next;
     document.querySelectorAll("[data-only]").forEach(function (el) {
@@ -1502,6 +1581,13 @@
     $("[data-leave]").addEventListener("click", leaveRoom);
     netCheckBtn.addEventListener("click", function () { runNetCheck(); });
     netCopyBtn.addEventListener("click", copyNetReport);
+    $("[data-post-use]").addEventListener("click", postUse);
+    $("[data-post-copy]").addEventListener("click", function (ev) {
+      copyText(ev.currentTarget, E.packMoves(moves), "Copied — send it");
+    });
+    $("[data-post-copy-link]").addEventListener("click", function (ev) {
+      copyText(ev.currentTarget, postLink(E.packMoves(moves)), "Copied — send it");
+    });
     $("[data-hand-start]").addEventListener("click", handStart);
     $("[data-hand-join]").addEventListener("click", handJoin);
     handGo.addEventListener("click", handUse);
@@ -1590,7 +1676,12 @@
   renderTally();
 
   var invited = NET.readLink(location.search, location.hash);
-  if (invited) {
+  var byMessage = /[?&]game=([A-Za-z0-9\-_]+)/.exec(location.search);
+  if (byMessage) {
+    setMode("post");
+    postIn.value = byMessage[1];
+    postUse();
+  } else if (invited) {
     setMode("online");
     joinInput.value = invited;
     joinRoom(invited);

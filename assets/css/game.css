@@ -361,6 +361,10 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .byhand[open] summary::after { content: "  ⌄"; }
 .byhand__note { font-size: .72rem; line-height: 1.45; color: var(--text-dim); margin: .6rem 0; }
 .byhand__step { font-size: .76rem; line-height: 1.45; color: var(--text-strong); margin: .7rem 0 .4rem; }
+.post__note { font-size: .76rem; line-height: 1.5; color: var(--text-dim); margin: .6rem 0 .8rem; }
+.post__said { font-size: .76rem; line-height: 1.45; margin: .6rem 0 0; color: var(--text-dim); }
+.post__said--good { color: var(--go-hi); }
+.post__said--bad { color: #e0876f; }
 .relaybox { margin: .9rem 0; padding-top: .7rem; border-top: 1px solid var(--line); }
 .relaybox .row2 { margin-top: .4rem; }
 .relaybox input { margin-top: .4rem; }

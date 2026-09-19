@@ -29,6 +29,24 @@ Rules 3 and 4 are the house variant this version plays; other versions send you
 anywhere as soon as a board has merely been *won*, which makes for a shorter,
 looser game.
 
+## Playing a friend by message
+
+The way that needs nothing at all: no matchmaking service, no relay, no
+connection between the two of you of any kind.
+
+Pick **A friend, by message**. Make your move and the page gives you a short
+code — three characters at the start of a game, under a hundred at the end of
+a long one. Send it however you already send things. They paste it in, see your
+move, reply, and send a code back.
+
+The code carries the **whole game**, not just the last move, so the two of you
+cannot drift apart: whatever arrives replays from the beginning, and a code
+that could not have come from a real game is refused. There is a link version
+too, if a tap is easier than a paste.
+
+It works on any network, between any two devices, because nothing travels
+except a message you sent yourself.
+
 ## Playing a friend online
 
 One of you presses **Create a room** and gets a four-word code, such as

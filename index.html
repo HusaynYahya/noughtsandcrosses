@@ -6,7 +6,7 @@
 <meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
 <meta name="theme-color" content="#161512" />
 <title>Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/game.css?v=22" />
+<link rel="stylesheet" href="assets/css/game.css?v=23" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body>
@@ -75,6 +75,7 @@
         <option value="local">Two players, one device</option>
         <option value="computer">The computer</option>
         <option value="online">A friend online</option>
+        <option value="post">A friend, by message</option>
       </select>
 
       <label class="lbl lbl--spaced" for="tc">Clock</label>
@@ -126,6 +127,30 @@
             </select>
           </div>
         </div>
+      </div>
+
+      <div data-only="post" hidden>
+        <p class="post__note">No connection of any kind. You make a move, the page
+          gives you a short code, you send it however you send anything. They
+          paste it, move, and send one back. The code carries the whole game, so
+          it cannot get out of step.</p>
+
+        <div data-post-send hidden>
+          <span class="lbl">Send this</span>
+          <textarea class="byhand__box" data-post-out readonly rows="2"></textarea>
+          <div class="row-btn">
+            <button class="btn btn--slim btn--go" type="button" data-post-copy>Copy the code</button>
+            <button class="btn btn--slim" type="button" data-post-copy-link>Copy a link</button>
+          </div>
+        </div>
+
+        <span class="lbl lbl--spaced">Their code</span>
+        <textarea class="byhand__box" data-post-in rows="2"
+                  placeholder="paste what they sent you"></textarea>
+        <div class="row-btn">
+          <button class="btn btn--slim" type="button" data-post-use>Use it</button>
+        </div>
+        <p class="post__said" data-post-said></p>
       </div>
 
       <div data-only="online" hidden>
@@ -326,12 +351,12 @@
   </aside>
 </main>
 
-<script src="assets/js/engine.js?v=22"></script>
-<script src="assets/js/features.js?v=22"></script>
-<script src="assets/js/weights.js?v=22"></script>
-<script src="assets/js/ai.js?v=22"></script>
-<script src="assets/js/analysis.js?v=22"></script>
-<script src="assets/js/net.js?v=22"></script>
-<script src="assets/js/app.js?v=22" defer></script>
+<script src="assets/js/engine.js?v=23"></script>
+<script src="assets/js/features.js?v=23"></script>
+<script src="assets/js/weights.js?v=23"></script>
+<script src="assets/js/ai.js?v=23"></script>
+<script src="assets/js/analysis.js?v=23"></script>
+<script src="assets/js/net.js?v=23"></script>
+<script src="assets/js/app.js?v=23" defer></script>
 </body>
 </html>

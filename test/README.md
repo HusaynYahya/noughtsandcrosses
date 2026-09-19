@@ -4,6 +4,14 @@
 node test/engine.test.js        # the rules, and that the solver proves what it claims
 ```
 
+```sh
+node test/bymessage.mjs          # two isolated browsers, codes passed by hand
+node test/bymessage2.mjs         # a whole game played that way, move by move
+```
+
+Those two need nothing but the page itself — which is the point of the mode
+they test.
+
 The connection is harder to test honestly, because the thing most likely to
 break is not in this repository. These two run the real library and real
 WebRTC rather than a stand-in, which is how it was established that the game's

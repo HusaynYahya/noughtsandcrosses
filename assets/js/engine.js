@@ -227,6 +227,57 @@
     return s;
   }
 
+  /* ---- a whole game as a short piece of text --------------------------- */
+  /* Every move is a number from 0 to 80, which is seven bits. The count goes
+     first, then the moves packed end to end, then base64 with the awkward
+     characters swapped so it survives being sent in a message or a link. A
+     forty-move game comes to about fifty characters.
+
+     The whole history is carried rather than the position, so the two sides
+     can never drift apart: whatever arrives replays from the beginning. */
+  var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+  function packMoves(moves) {
+    var bits = "", i;
+    bits += ("00000000" + (moves.length & 255).toString(2)).slice(-8);
+    for (i = 0; i < moves.length; i++) {
+      bits += ("0000000" + (moves[i] & 127).toString(2)).slice(-7);
+    }
+    while (bits.length % 6) bits += "0";
+    var out = "";
+    for (i = 0; i < bits.length; i += 6) out += B64.charAt(parseInt(bits.slice(i, i + 6), 2));
+    return out;
+  }
+
+  function unpackMoves(code) {
+    var text = String(code || "").trim().replace(/[^A-Za-z0-9\-_]/g, "");
+    if (!text) return null;
+    var bits = "", i, k;
+    for (i = 0; i < text.length; i++) {
+      k = B64.indexOf(text.charAt(i));
+      if (k < 0) return null;
+      bits += ("000000" + k.toString(2)).slice(-6);
+    }
+    if (bits.length < 8) return null;
+    var count = parseInt(bits.slice(0, 8), 2);
+    if (count > 81) return null;
+    var moves = [];
+    for (i = 0; i < count; i++) {
+      var at = 8 + i * 7;
+      if (at + 7 > bits.length) return null;
+      var m = parseInt(bits.slice(at, at + 7), 2);
+      if (m > 80) return null;
+      moves.push(m);
+    }
+    /* and it has to be a game that could actually have been played */
+    var s = create();
+    for (i = 0; i < moves.length; i++) {
+      if (!isLegal(s, moves[i])) return null;
+      apply(s, moves[i]);
+    }
+    return moves;
+  }
+
   root.UNC = root.UNC || {};
   root.UNC.engine = {
     EMPTY: EMPTY, X: X, O: O, DEAD: DEAD, FULL: FULL,
@@ -235,6 +286,7 @@
     create: create, clone: clone, copyInto: copyInto,
     at: at, occ: occ, isFull: isFull, activeBoard: activeBoard,
     legalMoves: legalMoves, isLegal: isLegal, apply: apply,
-    lineOf: lineOf, lineIndexOf: lineIndexOf, pack: pack, unpack: unpack
+    lineOf: lineOf, lineIndexOf: lineIndexOf, pack: pack, unpack: unpack,
+    packMoves: packMoves, unpackMoves: unpackMoves
   };
 })(typeof window !== "undefined" ? window : globalThis);
