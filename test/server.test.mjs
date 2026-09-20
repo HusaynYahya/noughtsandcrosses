@@ -121,7 +121,9 @@ for (let i = 0; i < 90; i++) {
   if (news.t === 'end' || news.game.over) { end = news; break; }
   await new Promise(r => setTimeout(r, 12));
 }
-const endA = end && end.t === 'end' ? end : await A.wait(m => m.t === 'end');
+/* each side is told separately, and each is told its own numbers — so read
+   both, rather than reading whichever arrived first twice */
+const endA = await A.wait(m => m.t === 'end');
 const endB = await B.wait(m => m.t === 'end');
 ok('the game ended', !!endA && endA.game.over, endA.game.ending + ', winner ' + endA.game.winner);
 ok('both were told the same', endA.game.winner === endB.game.winner);
