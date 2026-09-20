@@ -164,6 +164,8 @@ a { color: var(--go-hi); }
   color: var(--go-ink); background: var(--go);
 }
 .who__name { color: var(--text-strong); font-weight: 600; }
+.top__in { display: flex; gap: var(--s-2); flex: none; }
+@media (max-width: 620px) { .top__in .btn:not(.btn--go) { display: none; } }
 .who__rating { color: var(--text-dim); font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .who__name, .who .tag { display: none; } }
 
@@ -344,7 +346,8 @@ a { color: var(--go-hi); }
   text-transform: uppercase; letter-spacing: .11em; text-align: center;
 }
 
-select, input[type="text"], input[type="number"], input[type="password"] {
+select, input[type="text"], input[type="number"], input[type="password"],
+input[type="email"], input[type="search"] {
   width: 100%; font: inherit; font-size: var(--t-md);
   color: var(--text-strong); background: var(--bg-2);
   border: 1px solid var(--line); border-radius: var(--r-sm);

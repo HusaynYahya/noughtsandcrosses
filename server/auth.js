@@ -41,7 +41,33 @@ function tidyName(raw) {
 
 function okPassword(raw) {
   const p = String(raw || "");
-  return p.length >= 8 && p.length <= 200 ? p : null;
+  if (p.length < 8 || p.length > 200) return null;
+  /* eight characters of the same key is not a password */
+  if (/^(.)\1+$/.test(p)) return null;
+  return p;
 }
 
-module.exports = { hash, matches, token, fold, tidyName, okPassword, SESSION_LIFE };
+/* Enough of a check to catch a typo and a paste of the wrong thing. Whether an
+   address exists is not something a regular expression can tell you — the
+   letter that goes to it is what settles that. */
+function tidyEmail(raw) {
+  const email = String(raw || "").trim().toLowerCase();
+  if (email.length > 254) return null;
+  return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email) ? email : null;
+}
+
+/* A name that cannot be mistaken for somebody else's: two names differing only
+   by an O and a 0, or by a dash, are the oldest trick there is. */
+function unmistakable(name) {
+  return String(name || "").toLowerCase()
+    .replace(/[_\-.]/g, "")
+    .replace(/0/g, "o").replace(/1/g, "l").replace(/3/g, "e").replace(/4/g, "a")
+    .replace(/5/g, "s").replace(/7/g, "t").replace(/8/g, "b");
+}
+
+var LINK_LIFE = { verify: 24 * 3600 * 1000, reset: 3600 * 1000 };
+
+module.exports = {
+  hash, matches, token, fold, tidyName, okPassword, tidyEmail, unmistakable,
+  SESSION_LIFE, LINK_LIFE
+};

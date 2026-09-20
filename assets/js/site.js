@@ -13,6 +13,11 @@
 
   var doc = root.document;
 
+  function account() {
+    var a = root.UNC && root.UNC.account;
+    return a && a.configured() ? a : null;
+  }
+
   var PAGES = [
     { id: "home",  href: "index.html",       text: "Home" },
     { id: "play",  href: "play.html",        text: "Play" },
@@ -21,6 +26,8 @@
     { id: "learn", href: "learn.html",       text: "Learn" },
     { id: "engine", href: "paper.html",      text: "The engine" }
   ];
+  /* account.html is reached from the header buttons and the front page rather
+     than the navigation, the way a sign-in usually is */
 
   /* A handful of line drawings, kept here so every page uses the same ones.
      They are stroked with currentColor, so they take the colour of whatever
@@ -109,6 +116,8 @@
   function chrome() {
     var here = doc.body.getAttribute("data-page") || "";
     var me = root.UNC && root.UNC.player ? root.UNC.player.who() : null;
+    /* a server to sign in to, and nobody signed in to it */
+    var waiting = !!(account() && !account().me());
 
     var head = doc.createElement("header");
     head.className = "top";
@@ -126,14 +135,23 @@
               (p.id === here ? ' aria-current="page"' : "") + ">" + esc(p.text) + "</a>";
           }).join("") +
         "</nav>" +
-        (me ? '<a class="who" href="profile.html" title="Your profile">' +
+        /* Signed in: who you are. Signed out, with a server to sign in to: the
+           way in, because a way in nobody can find is not a way in — and not
+           both at once, or the header claims you are two people. */
+        (me && !waiting ? '<a class="who" href="profile.html" title="Your profile">' +
                 '<span class="who__face" style="background:' + tint(me.id) + '">' +
                   esc(initials(me.name)) + "</span>" +
                 '<span class="who__name">' + esc(me.name) + "</span>" +
                 '<span class="who__rating">' + Math.round(me.rating) + "</span>" +
                 (me.server ? '<span class="tag tag--go">account</span>'
                            : '<span class="tag">this browser</span>') +
-              "</a>" : "");
+              "</a>" : "") +
+        (waiting && here !== "account"
+          ? '<span class="top__in">' +
+              '<a class="btn btn--slim" href="account.html?in">Sign in</a>' +
+              '<a class="btn btn--slim btn--go" style="width:auto" href="account.html">' +
+              "Create an account</a></span>"
+          : "");
     doc.body.insertBefore(head, doc.body.firstChild);
 
     var foot = doc.createElement("footer");

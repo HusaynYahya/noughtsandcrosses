@@ -28,11 +28,14 @@ const crypto = require("crypto");
 const ws = require("./ws.js");
 const store = require("./db.js");
 const auth = require("./auth.js");
-const { Arena } = require("./arena.js");
+const { Arena, kindOf } = require("./arena.js");
+const mail = require("./mail.js");
 
 const PORT = +process.env.PORT || 8090;
 const ROOT = path.join(__dirname, "..");
 const ORIGINS = (process.env.UNC_ORIGINS || "*").split(",").map((s) => s.trim());
+/* where the pages live, for the links in letters; falls back to this server */
+const SITE = (process.env.UNC_SITE || "").replace(/\/+$/, "");
 
 const book = store.open(process.env.UNC_DB);
 const arena = new Arena(book);
@@ -98,21 +101,71 @@ function bearer(req) {
 }
 
 function card(p, place) {
-  return { id: p.id, name: p.name, rating: p.rating, best: p.best, games: p.games,
-           wins: p.wins, draws: p.draws, losses: p.losses, since: p.made,
-           place: place || null, provisional: p.games < 10 };
+  const out = {
+    id: p.id, name: p.name, rating: p.rating, best: p.best, games: p.games,
+    wins: p.wins, draws: p.draws, losses: p.losses, since: p.made,
+    place: place || null, provisional: p.games < 10,
+    ratings: {}
+  };
+  book.q.ratingsOf.all(p.id).forEach((r) => {
+    out.ratings[r.kind] = { rating: r.rating, best: r.best, games: r.games,
+                            wins: r.wins, draws: r.draws, losses: r.losses,
+                            provisional: r.games < 10 };
+  });
+  return out;
+}
+
+/* what only you may see about yourself */
+function mine(p, place) {
+  const out = card(p, place);
+  out.email = p.email || "";
+  out.verified = !!p.verified;
+  return out;
+}
+
+function signIn(player) {
+  const token = auth.token();
+  book.q.newSession.run(auth.fold(token), player.id, Date.now(), Date.now());
+  return token;
+}
+
+/* A link somebody can click out of an email. It points at the site when there
+   is one to point at, and at this server when there is not. */
+function linkFor(kind, token) {
+  const where = SITE || ("http://localhost:" + PORT);
+  return where + "/account.html?" + kind + "=" + encodeURIComponent(token);
+}
+
+function makeLink(player, kind) {
+  book.q.dropTokens.run(player.id, kind);
+  const token = auth.token();
+  book.q.newToken.run(auth.fold(token), player.id, kind, Date.now());
+  return linkFor(kind, token);
+}
+
+function readLink(kind, raw) {
+  if (!raw) return null;
+  const row = book.q.token.get(auth.fold(raw), kind);
+  if (!row || row.used) return null;
+  if (Date.now() - row.made > auth.LINK_LIFE[kind]) return null;
+  return row;
 }
 
 /* ---- knocking too often --------------------------------------------------- */
+/* Only failures are counted. Somebody signing in correctly ten times in a
+   minute is a person with several devices; somebody failing ten times is
+   working through a list. */
 const knocks = new Map();
-function tooMany(ip) {
+const PATIENCE = 10, MINUTE = 60000;
+
+function recently(ip) {
   const now = Date.now();
-  const seen = knocks.get(ip) || [];
-  const recent = seen.filter((t) => now - t < 60000);
-  recent.push(now);
-  knocks.set(ip, recent);
-  return recent.length > 12;
+  const seen = (knocks.get(ip) || []).filter((t) => now - t < MINUTE);
+  knocks.set(ip, seen);
+  return seen;
 }
+function tooMany(ip) { return recently(ip).length >= PATIENCE; }
+function missed(ip) { recently(ip).push(Date.now()); }
 
 /* ---- the api --------------------------------------------------------------- */
 async function api(req, res, url) {
@@ -131,29 +184,160 @@ async function api(req, res, url) {
     let sent;
     try { sent = await body(req); } catch (e) { return say(res, 400, { error: "Bad request." }); }
 
-    const name = auth.tidyName(sent.name);
     const password = auth.okPassword(sent.password);
-    if (!name) return say(res, 400, {
-      error: "A name is 2 to 20 letters, numbers, dashes or underscores, starting with a letter or number." });
-    if (!password) return say(res, 400, { error: "A password is at least 8 characters." });
 
-    let player = book.q.byName.get(name.toLowerCase());
-
-    if (route === "/api/register") {
-      if (player) return say(res, 409, { error: "That name is taken." });
-      const now = Date.now();
-      book.q.newPlayer.run(name, name.toLowerCase(), auth.hash(password), now, now);
-      player = book.q.byName.get(name.toLowerCase());
-    } else {
-      if (!player || !auth.matches(password, player.hash)) {
-        return say(res, 401, { error: "No such name, or the wrong password." });
+    /* ---- signing in: a name or an address, and the password ---- */
+    if (route === "/api/login") {
+      const who = String(sent.name || "").trim().toLowerCase();
+      const player = who.indexOf("@") > 0
+        ? book.q.byEmail.get(who)
+        : book.q.byName.get(who);
+      /* the same answer either way, so this cannot be used to ask whether
+         somebody has an account here */
+      if (!player || !password || !auth.matches(sent.password, player.hash)) {
+        missed(ip);
+        return say(res, 401, { error: "No such name or address, or the wrong password." });
       }
       book.q.seen.run(Date.now(), player.id);
+      return say(res, 200, { token: signIn(player), me: mine(player) });
     }
 
-    const token = auth.token();
-    book.q.newSession.run(auth.fold(token), player.id, Date.now(), Date.now());
-    return say(res, 200, { token, me: card(player) });
+    /* ---- making an account ---- */
+    const name = auth.tidyName(sent.name);
+    const email = auth.tidyEmail(sent.email);
+    if (!name) return say(res, 400, {
+      error: "A name is 2 to 20 letters, numbers, dashes or underscores, " +
+             "starting with a letter or number." });
+    if (!email) return say(res, 400, {
+      error: "That address does not look right. It is what gets you back in " +
+             "if you forget your password." });
+    if (!password) return say(res, 400, {
+      error: "A password is at least 8 characters, and not the same one eight times." });
+
+    if (book.q.byName.get(name.toLowerCase())) {
+      missed(ip);
+      return say(res, 409, { error: "That name is taken." });
+    }
+    const plain = auth.unmistakable(name);
+    if (book.q.byPlain.get(plain)) {
+      missed(ip);
+      return say(res, 409, {
+        error: "That name is too close to one somebody already has — near enough " +
+               "that people would mix you up." });
+    }
+    if (book.q.byEmail.get(email)) {
+      return say(res, 409, { error: "There is already an account on that address." });
+    }
+
+    const now = Date.now();
+    book.q.newPlayer.run(name, name.toLowerCase(), plain, auth.hash(sent.password),
+                         email, now, now);
+    const player = book.q.byName.get(name.toLowerCase());
+    mail.verify(email, player.name, makeLink(player, "verify"));
+    return say(res, 200, { token: signIn(player), me: mine(player),
+                           posted: mail.configured() });
+  }
+
+  /* ---- proving the address, and getting back in without it ---- */
+  if (route === "/api/verify") {
+    const sent = req.method === "POST" ? await body(req).catch(() => ({})) : {};
+    const given = sent.token || url.searchParams.get("token");
+    const row = readLink("verify", given);
+    if (!row) return say(res, 400, { error: "That link has expired or been used already." });
+    book.q.useToken.run(auth.fold(given));
+    book.q.verify.run(row.player);
+    const player = book.q.byId.get(row.player);
+    return say(res, 200, { ok: true, me: mine(player) });
+  }
+
+  if (route === "/api/verify/again") {
+    const player = playerFor(bearer(req));
+    if (!player) return say(res, 401, { error: "Not signed in." });
+    if (player.verified) return say(res, 200, { ok: true, already: true });
+    if (!player.email) return say(res, 400, { error: "There is no address on this account." });
+    if (tooMany(ip)) return say(res, 429, { error: "Too many tries. Wait a minute." });
+    missed(ip);
+    mail.verify(player.email, player.name, makeLink(player, "verify"));
+    return say(res, 200, { ok: true, posted: mail.configured() });
+  }
+
+  if (route === "/api/forgot") {
+    if (req.method !== "POST") return say(res, 405, { error: "Post it." });
+    if (tooMany(ip)) return say(res, 429, { error: "Too many tries. Wait a minute." });
+    missed(ip);
+    const sent = await body(req).catch(() => ({}));
+    const who = String(sent.name || "").trim().toLowerCase();
+    const player = who.indexOf("@") > 0 ? book.q.byEmail.get(who) : book.q.byName.get(who);
+    if (player && player.email) {
+      mail.reset(player.email, player.name, makeLink(player, "reset"));
+    }
+    /* the same answer whether or not there was anybody there */
+    return say(res, 200, {
+      ok: true,
+      said: "If there is an account there, a letter is on its way. It is good " +
+            "for an hour." });
+  }
+
+  if (route === "/api/reset") {
+    if (req.method !== "POST") return say(res, 405, { error: "Post it." });
+    const sent = await body(req).catch(() => ({}));
+    const row = readLink("reset", sent.token);
+    if (!row) return say(res, 400, { error: "That link has expired or been used already." });
+    const fresh = auth.okPassword(sent.password);
+    if (!fresh) return say(res, 400, { error: "A password is at least 8 characters." });
+    book.q.useToken.run(auth.fold(sent.token));
+    book.q.setPass.run(auth.hash(sent.password), row.player);
+    /* whoever was signed in elsewhere is signed out: the point of a reset */
+    book.q.dropSessionsOf.run(row.player);
+    const player = book.q.byId.get(row.player);
+    return say(res, 200, { token: signIn(player), me: mine(player) });
+  }
+
+  /* ---- looking after your own account ---- */
+  if (route === "/api/password") {
+    const player = playerFor(bearer(req));
+    if (!player) return say(res, 401, { error: "Not signed in." });
+    const sent = await body(req).catch(() => ({}));
+    if (!auth.matches(String(sent.old || ""), player.hash)) {
+      missed(ip);
+      return say(res, 403, { error: "That is not your current password." });
+    }
+    const fresh = auth.okPassword(sent.password);
+    if (!fresh) return say(res, 400, { error: "A password is at least 8 characters." });
+    book.q.setPass.run(auth.hash(sent.password), player.id);
+    book.q.dropSessionsOf.run(player.id);
+    return say(res, 200, { token: signIn(player), ok: true });
+  }
+
+  if (route === "/api/email") {
+    const player = playerFor(bearer(req));
+    if (!player) return say(res, 401, { error: "Not signed in." });
+    const sent = await body(req).catch(() => ({}));
+    const email = auth.tidyEmail(sent.email);
+    if (!email) return say(res, 400, { error: "That address does not look right." });
+    if (!auth.matches(String(sent.password || ""), player.hash)) {
+      return say(res, 403, { error: "Your password, to be sure it is you." });
+    }
+    const taken = book.q.byEmail.get(email);
+    if (taken && taken.id !== player.id) {
+      return say(res, 409, { error: "There is already an account on that address." });
+    }
+    book.q.setEmail.run(email, 0, player.id);
+    const after = book.q.byId.get(player.id);
+    mail.verify(email, after.name, makeLink(after, "verify"));
+    return say(res, 200, { ok: true, me: mine(after), posted: mail.configured() });
+  }
+
+  if (route === "/api/close") {
+    const player = playerFor(bearer(req));
+    if (!player) return say(res, 401, { error: "Not signed in." });
+    const sent = await body(req).catch(() => ({}));
+    if (!auth.matches(String(sent.password || ""), player.hash)) {
+      return say(res, 403, { error: "Your password, to be sure it is you." });
+    }
+    /* the games stay, under the name they were played with; nothing else does */
+    book.q.removePlayer.run(player.id);
+    return say(res, 200, { ok: true });
   }
 
   if (route === "/api/logout") {
@@ -165,16 +349,24 @@ async function api(req, res, url) {
   if (route === "/api/me") {
     const player = playerFor(bearer(req));
     if (!player) return say(res, 401, { error: "Not signed in." });
-    return say(res, 200, { me: card(player, book.q.placeOf.get(player.rating).place) });
+    return say(res, 200, { me: mine(player, book.q.placeOf.get(player.rating).place) });
   }
 
   if (route === "/api/leaderboard") {
     const limit = Math.max(1, Math.min(200, +url.searchParams.get("limit") || 50));
-    const rows = book.q.ladder.all(limit).map((p, i) => Object.assign(card(p), {
-      place: i + 1, online: arena.here(arena.people.get(p.id))
+    const kind = String(url.searchParams.get("kind") || "overall");
+    const rows = (kind === "overall"
+      ? book.q.ladder.all(limit)
+      : book.q.ladderOf.all(kind, limit)
+    ).map((p, i) => ({
+      id: p.id, name: p.name, rating: p.rating, best: p.best, games: p.games,
+      wins: p.wins, draws: p.draws, losses: p.losses, seen: p.seen,
+      provisional: p.games < 10, place: i + 1,
+      online: arena.here(arena.people.get(p.id))
     }));
-    return say(res, 200, { table: rows, players: book.q.countPlayers.get().n,
-                           games: book.q.countGames.get().n });
+    return say(res, 200, { kind, table: rows, players: book.q.countPlayers.get().n,
+                           games: book.q.countGames.get().n,
+                           kinds: ["overall", "bullet", "blitz", "rapid", "untimed"] });
   }
 
   if (route.indexOf("/api/players/") === 0) {

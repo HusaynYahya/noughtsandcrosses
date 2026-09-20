@@ -11,7 +11,16 @@
   var ACC = window.UNC.account;
   var online = {};
   var view = ACC.configured() ? "server" : "local";
+  var kind = "overall";   /* which clock's ladder */
   var ladder = null;      /* what the server last said */
+
+  var CLOCKS = {
+    overall: "every rated game, whatever the clock",
+    bullet: "a minute or so a game",
+    blitz: "three to ten minutes",
+    rapid: "ten minutes and up",
+    untimed: "no clock at all"
+  };
 
   var BLURB = {
     server: "Everybody who has played a rated game on this server, strongest " +
@@ -24,11 +33,12 @@
 
   function drawServer() {
     var rows = (ladder && ladder.table) || [];
+    document.querySelector("[data-kinds]").hidden = view !== "server";
     var me = ACC.me();
     var mine = me ? rows.filter(function (r) { return r.id === me.id; })[0] : null;
 
     document.querySelector("[data-tiles]").innerHTML =
-      tile(ladder ? ladder.players : "—", "players", "with an account here") +
+      tile(ladder ? ladder.players : "—", "players", CLOCKS[kind]) +
       tile(ladder ? ladder.games : "—", "games played", "kept on the server") +
       tile(mine ? mine.rating : (me ? me.rating : "—"), "your rating",
            mine ? "#" + mine.place + " on the ladder" : me ? "unrated so far" : "sign in to join") +
@@ -109,6 +119,17 @@
            (sub ? '<span class="tile__sub">' + S.esc(sub) + "</span>" : "") + "</div>";
   }
 
+  function fetchLadder(note) {
+    ACC.ask("/api/leaderboard?kind=" + encodeURIComponent(kind)).then(function (got) {
+      ladder = got;
+      note.textContent = S.plural(got.players, "player") + " on this server";
+      draw();
+    }, function (err) {
+      note.textContent = err.message;
+      if (view === "server") { view = "local"; tabs(); draw(); }
+    });
+  }
+
   function tabs() {
     var bar = document.querySelector("[data-tabs]");
     if (!ACC.configured()) return;
@@ -128,16 +149,20 @@
     draw();
     var note = document.querySelector("[data-live-note]");
 
-    if (ACC.configured()) {
-      ACC.ask("/api/leaderboard").then(function (got) {
-        ladder = got;
-        note.textContent = S.plural(got.players, "player") + " on this server";
+    if (ACC.configured()) fetchLadder(note);
+
+    document.querySelectorAll("[data-kind]").forEach(function (b) {
+      b.classList.toggle("tab--on", b.getAttribute("data-kind") === kind);
+      b.addEventListener("click", function () {
+        kind = b.getAttribute("data-kind");
+        document.querySelectorAll("[data-kind]").forEach(function (o) {
+          o.classList.toggle("tab--on", o.getAttribute("data-kind") === kind);
+        });
+        ladder = null;
         draw();
-      }, function (err) {
-        note.textContent = err.message;
-        if (view === "server") { view = "local"; tabs(); draw(); }
+        fetchLadder(note);
       });
-    }
+    });
 
     var lobby = window.UNC.lobby.join({
       list: function (seeks, count) {

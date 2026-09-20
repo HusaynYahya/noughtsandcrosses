@@ -18,6 +18,15 @@ well, so one box can host the whole thing.
 | `PORT` | What to listen on. Default 8090. |
 | `UNC_DB` | Where the database file goes. Default `server/unc.db`. |
 | `UNC_ORIGINS` | Comma-separated list of sites allowed to call it. Default: any. |
+| `UNC_SITE` | Where the pages live, for the links in letters. Default: this server. |
+| `UNC_MAIL_URL` | An HTTP mail endpoint — Resend, Postmark, Mailgun, your own. |
+| `UNC_MAIL_KEY` | Its bearer token. |
+| `UNC_MAIL_FROM` | Who the letters come from. |
+
+**With no mail service set**, accounts still work: the link that would have been
+sent is written to the log instead, and an address simply stays unproved. That
+is the right way round while you are setting the thing up, and the wrong way
+round to leave it — an unproved address cannot get anybody back in.
 
 ## What it is for
 
@@ -46,22 +55,60 @@ the server enforces and the rules the board offers cannot drift apart.
 | `rating.js` | Elo, the only copy that counts |
 | `rules.js` | Loads the browser's engine so there is one set of rules |
 
+## Accounts
+
+The shape a chess site uses, and for the same reasons.
+
+- **A name, an address and a password.** The address is only ever used to prove
+  the account is yours and to get you back in; nothing else is sent to it.
+- **Names cannot be mistaken for each other.** `husayn`, `hu5ayn` and `hu-sayn`
+  are the same name as far as registration is concerned, so nobody can register
+  a lookalike of somebody else.
+- **Passwords** are scrypt with a per-password salt, at least eight characters,
+  and not one key held down. Changing one signs out everywhere else.
+- **Proving the address** is a one-shot link, good for a day. You can play
+  before proving it; you cannot recover the account without it.
+- **Getting back in** is a one-shot link, good for an hour, and the answer to
+  asking for one is the same whether or not there was an account there — so it
+  cannot be used to ask who has an account here.
+- **Failures are what counts against you.** Ten wrong answers a minute from one
+  address and it stops listening for a while; ten right ones is just somebody
+  with several devices.
+- **Closing an account** removes it and everything about it. The games stay on
+  file under the name they were played with, because they were somebody else's
+  games too.
+
 ## The API
 
 Everything answers JSON. A token goes in `Authorization: Bearer …`; there are
 no cookies, so there is nothing for another site to make a browser send.
 
 ```
-POST /api/register  {name, password}   -> {token, me}
-POST /api/login     {name, password}   -> {token, me}
+POST /api/register     {name, email, password}  -> {token, me}
+POST /api/login        {name|email, password}   -> {token, me}
 POST /api/logout
 GET  /api/me
-GET  /api/leaderboard?limit=50
+POST /api/verify       {token}                  -> proves an address
+POST /api/verify/again                          -> sends the letter again
+POST /api/forgot       {name|email}             -> always the same answer
+POST /api/reset        {token, password}        -> new password, signed in
+POST /api/password     {old, password}          -> signs out everywhere else
+POST /api/email        {email, password}
+POST /api/close        {password}               -> removes the account
+GET  /api/leaderboard?kind=blitz&limit=50
 GET  /api/players/:name                -> profile and recent games
 GET  /api/games?player=name&limit=30
 GET  /api/game/:id                     -> one game, whole
 GET  /api/health
 ```
+
+## Ratings
+
+Every rated game moves two ratings: an overall one, and one for the kind of
+clock it was played on — **bullet** (about a minute a game), **blitz** (three
+to ten), **rapid** (ten and up) and **untimed**. Being good at five minutes
+says little about being good at ten seconds, so the ladders are kept apart, and
+the leaderboard has a tab for each.
 
 The live half is one socket at `/ws`. The client says `hello` with its token;
 after that it can `seek`, `unseek`, `move`, `resign`, `draw`, `claim` and

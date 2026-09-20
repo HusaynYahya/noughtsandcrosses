@@ -28,16 +28,61 @@ const get = (path, token) => fetch(base + path,
   .then(async r => ({ status: r.status, body: await r.json() }));
 
 /* ---- accounts ---------------------------------------------------------- */
-const one = await post('/api/register', { name: 'ada', password: 'analytical-engine' });
-const two = await post('/api/register', { name: 'linus', password: 'just-for-fun!' });
-ok('two accounts made', one.status === 200 && two.status === 200, JSON.stringify(one.body.me?.name) + ' & ' + JSON.stringify(two.body.me?.name));
-ok('the name is taken now', (await post('/api/register', { name: 'ADA', password: 'another-one' })).status === 409);
-ok('a short password is refused', (await post('/api/register', { name: 'bob', password: 'short' })).status === 400);
-ok('a silly name is refused', (await post('/api/register', { name: 'a b', password: 'long-enough-1' })).status === 400);
+const acc = (name, email, password) => post('/api/register', { name, email, password });
+const one = await acc('ada', 'ada@example.com', 'analytical-engine');
+const two = await acc('linus', 'linus@example.com', 'just-for-fun!');
+ok('two accounts made', one.status === 200 && two.status === 200,
+   JSON.stringify(one.body.me?.name) + ' & ' + JSON.stringify(two.body.me?.name));
+ok('the name is taken now', (await acc('ADA', 'other@example.com', 'another-one')).status === 409);
+ok('so is one that reads the same', (await acc('4da', 'other@example.com', 'another-one')).status === 409,
+   'a-d-a with a four for an A');
+ok('so is the address', (await acc('adaa', 'ada@example.com', 'another-one')).status === 409);
+ok('a short password is refused', (await acc('bob', 'bob@example.com', 'short')).status === 400);
+ok('one key eight times is refused', (await acc('bob', 'bob@example.com', 'aaaaaaaa')).status === 400);
+ok('a silly name is refused', (await acc('a b', 'bob@example.com', 'long-enough-1')).status === 400);
+ok('a broken address is refused', (await acc('bob', 'bob@nope', 'long-enough-1')).status === 400);
 ok('the wrong password is refused', (await post('/api/login', { name: 'ada', password: 'nope-nope-nope' })).status === 401);
 ok('the right one is not', (await post('/api/login', { name: 'ada', password: 'analytical-engine' })).status === 200);
+ok('signing in by address works too',
+   (await post('/api/login', { name: 'ADA@example.com', password: 'analytical-engine' })).status === 200);
 ok('a token names its owner', (await get('/api/me', one.body.token)).body.me.name === 'ada');
+ok('and carries the address', (await get('/api/me', one.body.token)).body.me.email === 'ada@example.com');
+ok('which is not proved yet', (await get('/api/me', one.body.token)).body.me.verified === false);
 ok('no token, no answer', (await get('/api/me')).status === 401);
+
+/* the letters: nothing is sent anywhere here, so the server logs the link and
+   the test reads the token out of the database, exactly as a click would */
+const { DatabaseSync } = await import('node:sqlite');
+const peek = new DatabaseSync(DB, { readOnly: true });
+const linkFor = (who, kind) => {
+  const row = peek.prepare(
+    'SELECT t.token FROM tokens t JOIN players p ON p.id = t.player ' +
+    'WHERE p.lower = ? AND t.kind = ? AND t.used = 0 ORDER BY t.made DESC').get(who, kind);
+  return row ? row.token : null;
+};
+ok('making an account posts a letter', !!linkFor('ada', 'verify'), 'a verify token is waiting');
+
+/* the token in the database is a hash, so the raw one only exists in the link;
+   proving it therefore goes through the same endpoint with a fresh one */
+await post('/api/verify/again', {}, one.body.token);
+ok('the letter can be asked for again', !!linkFor('ada', 'verify'));
+
+const forgot = await post('/api/forgot', { name: 'nobody@example.com' });
+ok('forgetting gives nothing away', forgot.status === 200 && !!forgot.body.said,
+   forgot.body.said);
+await post('/api/forgot', { name: 'linus' });
+ok('but a real one gets a link', !!linkFor('linus', 'reset'));
+
+/* changing a password signs everything else out */
+const changed = await post('/api/password',
+  { old: 'just-for-fun!', password: 'still-just-for-fun' }, two.body.token);
+ok('a password can be changed', changed.status === 200 && !!changed.body.token);
+ok('the old session is gone', (await get('/api/me', two.body.token)).status === 401);
+ok('the new one works', (await get('/api/me', changed.body.token)).body.me.name === 'linus');
+ok('the wrong current password is refused',
+   (await post('/api/password', { old: 'nope', password: 'whatever-it-is' },
+               changed.body.token)).status === 403);
+two.body.token = changed.body.token;
 
 /* ---- two players, one game --------------------------------------------- */
 const talk = (token) => new Promise((done) => {
@@ -129,6 +174,13 @@ ok('the game ended', !!endA && endA.game.over, endA.game.ending + ', winner ' + 
 ok('both were told the same', endA.game.winner === endB.game.winner);
 ok('it was rated', endA.rated && endA.rating.change !== undefined,
    'ada ' + endA.rating.before + ' → ' + endA.rating.after);
+ok('and on the ladder for its clock', endA.kind === 'untimed' && !!endA.kindRating,
+   endA.kind + ' ' + endA.kindRating.before + ' → ' + endA.kindRating.after);
+const byKind = await get('/api/leaderboard?kind=untimed');
+ok('which has its own table', byKind.body.table.length === 2 && byKind.body.kind === 'untimed',
+   byKind.body.table.map(r => r.name + ' ' + r.rating).join(', '));
+ok('and an empty one for another clock',
+   (await get('/api/leaderboard?kind=bullet')).body.table.length === 0);
 ok('the points balance', endA.rating.change + endB.rating.change === 0,
    endA.rating.change + ' and ' + endB.rating.change);
 
@@ -153,6 +205,15 @@ await new Promise(r => setTimeout(r, 600));
 const after = await get('/api/health');
 ok('a seek dies with its maker', after.body.online <= 2);
 
+/* ---- closing an account -------------------------------------------------- */
+const gone = await post('/api/close', { password: 'still-just-for-fun' }, two.body.token);
+ok('an account can be closed', gone.status === 200);
+ok('and is then gone', (await get('/api/players/linus')).status === 404);
+ok('but the games it played are not',
+   (await get('/api/game/' + gameId)).body.game.o.name === 'linus' ||
+   (await get('/api/game/' + gameId)).body.game.x.name === 'linus');
+
+peek.close();
 console.log(`\n${bad ? bad + ' of ' + checks + ' FAILED' : 'all ' + checks + ' checks passed'}`);
 server.kill();
 process.exit(bad ? 1 : 0);

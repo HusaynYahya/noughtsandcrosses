@@ -22,6 +22,23 @@ const TICK = 500;
 
 function id(n) { return crypto.randomBytes(n || 9).toString("base64url"); }
 
+/* Which ladder a game belongs on. Being good at five minutes says little
+   about being good at ten seconds, so each kind of clock keeps its own rating
+   — the way a chess site does it. The estimate for a game with an increment is
+   the base plus forty of them, which is roughly how long a game takes. */
+function kindOf(clock) {
+  if (!clock.base && !clock.perMove) return "untimed";
+  if (clock.perMove) {
+    if (clock.perMove < 30000) return "bullet";
+    if (clock.perMove < 120000) return "blitz";
+    return "rapid";
+  }
+  const guess = clock.base + 40 * clock.inc;
+  if (guess < 180000) return "bullet";
+  if (guess < 600000) return "blitz";
+  return "rapid";
+}
+
 /* "300+3" | "move:300" | "0" */
 function readClock(tc) {
   const text = String(tc || "0");
@@ -325,7 +342,9 @@ class Arena {
 
     const rated = game.moves.length >= RATED_FROM;
     const before = { x: game.x.rating, o: game.o.rating };
+    const kind = kindOf(game.clock);
     let next = before;
+    let kindWas = null, kindNow = null;
     if (rated) {
       next = rating.settle(
         { rating: game.x.rating, games: game.x.games },
@@ -333,6 +352,18 @@ class Arena {
         winner);
       this.record(game.x, next.x, winner === X ? 1 : winner === 0 ? 0.5 : 0);
       this.record(game.o, next.o, winner === O ? 1 : winner === 0 ? 0.5 : 0);
+
+      /* and again on the ladder this clock belongs to */
+      const rows = {
+        x: this.ratingRow(game.x.id, kind),
+        o: this.ratingRow(game.o.id, kind)
+      };
+      kindWas = { x: rows.x.rating, o: rows.o.rating };
+      kindNow = rating.settle(rows.x, rows.o, winner);
+      this.recordKind(game.x.id, kind, kindNow.x,
+        winner === X ? 1 : winner === 0 ? 0.5 : 0);
+      this.recordKind(game.o.id, kind, kindNow.o,
+        winner === O ? 1 : winner === 0 ? 0.5 : 0);
     }
 
     const row = {
@@ -354,13 +385,27 @@ class Arena {
         t: "end",
         game: this.view(game, p),
         rated,
+        kind,
         rating: { before: before[mine], after: next[mine],
-                  change: next[mine] - before[mine] }
+                  change: next[mine] - before[mine] },
+        kindRating: kindWas ? { before: kindWas[mine], after: kindNow[mine],
+                                change: kindNow[mine] - kindWas[mine] } : null
       });
       p.game = null;
     });
     this.games.delete(game.id);
     this.toLobby();
+  }
+
+  /* the row for one player on one ladder, made the first time they play there */
+  ratingRow(id, kind) {
+    this.book.q.newRating.run(id, kind);
+    return this.book.q.rating.get(id, kind);
+  }
+
+  recordKind(id, kind, newRating, score) {
+    this.book.q.ratingScored.run(newRating, newRating,
+      score === 1 ? 1 : 0, score === 0.5 ? 1 : 0, score === 0 ? 1 : 0, id, kind);
   }
 
   record(who, newRating, score) {
@@ -397,4 +442,4 @@ function sidesFit(a, b) {
   return a !== b;                 /* one wants crosses, the other noughts */
 }
 
-module.exports = { Arena, readClock, X, O };
+module.exports = { Arena, readClock, kindOf, X, O };

@@ -68,12 +68,48 @@
     });
   }
 
-  function join(name, password, isNew) {
-    return ask(isNew ? "/api/register" : "/api/login", { body: { name: name, password: password } })
+  /* Making an account takes a name, an address and a password; signing in
+     takes the name or the address, and the password. */
+  function join(fields, isNew) {
+    var body = isNew
+      ? { name: fields.name, email: fields.email, password: fields.password }
+      : { name: fields.name, password: fields.password };
+    return ask(isNew ? "/api/register" : "/api/login", { body: body })
       .then(function (got) {
         keep(got.token, got.me);
-        return got.me;
+        return got;
       });
+  }
+
+  /* the rest of looking after an account */
+  function forgot(who) { return ask("/api/forgot", { body: { name: who } }); }
+
+  function reset(token, password) {
+    return ask("/api/reset", { body: { token: token, password: password } })
+      .then(function (got) { keep(got.token, got.me); return got.me; });
+  }
+
+  function verify(token) {
+    return ask("/api/verify", { body: { token: token } })
+      .then(function (got) { if (me()) keep(token_(), got.me); return got.me; });
+  }
+  function token_() { return token(); }
+
+  function verifyAgain() { return ask("/api/verify/again", { body: {} }); }
+
+  function changePassword(old, password) {
+    return ask("/api/password", { body: { old: old, password: password } })
+      .then(function (got) { keep(got.token, me()); return got; });
+  }
+
+  function changeEmail(email, password) {
+    return ask("/api/email", { body: { email: email, password: password } })
+      .then(function (got) { keep(token(), got.me); return got; });
+  }
+
+  function close(password) {
+    return ask("/api/close", { body: { password: password } })
+      .then(function (got) { keep("", null); return got; });
   }
 
   function leave() {
@@ -160,6 +196,8 @@
   root.UNC.account = {
     where: base, configured: function () { return !!base(); },
     token: token, me: me, forget: function () { keep("", null); },
-    join: join, leave: leave, refresh: refresh, ask: ask, socket: socket
+    join: join, leave: leave, refresh: refresh, ask: ask, socket: socket,
+    forgot: forgot, reset: reset, verify: verify, verifyAgain: verifyAgain,
+    changePassword: changePassword, changeEmail: changeEmail, close: close
   };
 })(typeof window !== "undefined" ? window : globalThis);

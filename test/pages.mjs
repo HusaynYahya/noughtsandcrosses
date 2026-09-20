@@ -20,6 +20,7 @@ const pages = [
   ['games.html', '[data-tiles] .tile'],
   ['profile.html', '[data-tiles] .tile'],
   ['learn.html', '.diagram'],
+  ['account.html', '[data-form]'],
   ['paper.html', 'h1'],
   ['progress.html', 'h1']
 ];

@@ -34,29 +34,49 @@ const marks = (p) => p.locator('.cell--x, .cell--o').count();
 const A = await mk('A'), B = await mk('B');
 
 /* make two accounts through the page itself */
-async function signUp(p, name, pass) {
-  await p.goto(site + 'index.html');
-  await p.waitForSelector('[data-signup]');
-  await p.fill('[data-acc-name]', name);
-  await p.fill('[data-acc-pass]', pass);
-  await p.click('[data-signup]');
-  await p.waitForTimeout(1500);
+async function signUp(p, name, email, pass) {
+  await p.goto(site + 'account.html');
+  await p.waitForSelector('#name');
+  await p.fill('#name', name);
+  await p.fill('#email', email);
+  await p.fill('#pass', pass);
+  await p.click('[data-go]');
+  await p.waitForSelector('[data-form] h1', { timeout: 8000 });
+  await p.waitForTimeout(600);
+  return (await p.textContent('[data-form] h1')).trim();
 }
-await signUp(A, 'ada', 'analytical-engine');
-await signUp(B, 'linus', 'just-for-fun!');
-say('two accounts, made on the page', (await A.textContent('[data-account-body]')).replace(/\s+/g, ' ').slice(0, 30) +
-    ' | ' + (await B.textContent('[data-account-body]')).replace(/\s+/g, ' ').slice(0, 30));
+say('made on the page', await signUp(A, 'ada', 'ada@example.com', 'analytical-engine'));
+say('and again', await signUp(B, 'linus', 'linus@example.com', 'just-for-fun!'));
+await A.goto(site + 'index.html');
+await B.goto(site + 'index.html');
+await A.waitForTimeout(1200);
+await B.waitForTimeout(1200);
 say('the header knows who you are', (await A.textContent('.who')).replace(/\s+/g, ' ').trim());
 say('the lobby is the server now', (await A.textContent('[data-lobby-name]')).trim());
 
 /* wrong password, right password */
 const ctxC = await mk('C');
-await ctxC.goto(site + 'index.html');
-await ctxC.fill('[data-acc-name]', 'ada');
-await ctxC.fill('[data-acc-pass]', 'not-the-password');
-await ctxC.click('[data-signin]');
-await ctxC.waitForTimeout(900);
-say('a wrong password is refused', (await ctxC.textContent('[data-acc-said]')).trim());
+await ctxC.goto(site + 'account.html?in');
+await ctxC.waitForSelector('#name');
+await ctxC.fill('#name', 'ada');
+await ctxC.fill('#pass', 'not-the-password');
+await ctxC.click('[data-go]');
+await ctxC.waitForTimeout(1200);
+say('a wrong password is refused', (await ctxC.textContent('[data-said]')).trim());
+await ctxC.fill('#pass', 'analytical-engine');
+await ctxC.click('[data-go]');
+await ctxC.waitForTimeout(1500);
+say('the right one is not', (await ctxC.textContent('[data-form] h1')).trim());
+
+/* asking for a way back in gives nothing away either way */
+const ctxD = await mk('D0');
+await ctxD.goto(site + 'account.html?in');
+await ctxD.waitForSelector('[data-to="forgot"]');
+await ctxD.click('[data-to="forgot"]');
+await ctxD.fill('#name', 'nobody@example.com');
+await ctxD.click('[data-go]');
+await ctxD.waitForTimeout(1200);
+say('forgotten password', (await ctxD.textContent('[data-form]')).replace(/\s+/g, ' ').slice(0, 64));
 
 /* A offers a game, B takes it */
 await A.waitForTimeout(800);
@@ -127,11 +147,8 @@ say('a finished game opens by link', (await marks(D)) + ' marks, ' +
 /* somebody who walks out of a game can be claimed against */
 const E1 = await mk('E'), F1 = await mk('F');
 for (const [p, n] of [[E1, 'grace'], [F1, 'edsger']]) {
+  await signUp(p, n, n + '@example.com', 'a-good-long-password');
   await p.goto(site + 'index.html');
-  await p.waitForSelector('[data-signup]');
-  await p.fill('[data-acc-name]', n);
-  await p.fill('[data-acc-pass]', 'a-good-long-password');
-  await p.click('[data-signup]');
   await p.waitForTimeout(1200);
 }
 await E1.selectOption('[data-seek-tc]', '0');

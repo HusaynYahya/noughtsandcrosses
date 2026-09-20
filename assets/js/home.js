@@ -32,63 +32,70 @@
   var lobby = null, offers = [];
   var sock = null, onServer = false;   /* the server's lobby, when there is one */
 
-  /* ---- your account, if this site has a server --------------------------- */
+  /* ---- your account, if this site has one to offer ----------------------- */
+  /* The card says one of three things: make an account, you are in one, or
+     this site has no server so there are none to make. Whichever it is, it
+     says it plainly rather than quietly not being there. */
   function drawAccount() {
     var card = $("[data-account]");
-    if (!A.configured()) { card.hidden = true; return; }
+    var body = $("[data-account-body]"), head = $("[data-account-head]");
+    var where = $("[data-account-where]");
     card.hidden = false;
-    $("[data-account-where]").textContent = A.where().replace(/^https?:\/\//, "");
-    var body = $("[data-account-body]"), me = A.me();
+
+    if (!A.configured()) {
+      head.textContent = "Accounts";
+      where.textContent = "";
+      body.innerHTML =
+        "<p>This site has no server behind it yet, so there is nothing to sign " +
+        "in to. Everything you play is kept in this browser, and a private room " +
+        "with a friend needs no account at all.</p>" +
+        '<div class="row-btn">' +
+          '<a class="btn btn--slim" href="account.html">What an account would add</a>' +
+        "</div>";
+      return;
+    }
+
+    var me = A.me();
+    where.textContent = A.where().replace(/^https?:\/\//, "");
 
     if (me) {
-      $("[data-account-head]").textContent = "Signed in";
+      head.textContent = "Signed in";
       body.innerHTML =
         '<div class="youcard">' + S.face(me, true) +
-          "<div><b class=\"youcard__name\">" + S.esc(me.name) + "</b>" +
+          '<div><b class="youcard__name">' + S.esc(me.name) + "</b>" +
           '<span class="youcard__rating">' + me.rating +
             (me.provisional ? '<span class="tag">provisional</span>' : "") +
             (me.place ? " · #" + me.place : "") + "</span></div></div>" +
-        '<div class="row-btn" style="margin-top:.7rem">' +
+        (me.verified === false
+          ? '<p class="netline">Your address is not proved yet — ' +
+            '<button class="linkish" type="button" data-again>send the letter again</button>.</p>'
+          : "") +
+        '<div class="row-btn" style="margin-top:var(--s-3)">' +
           '<a class="btn btn--slim" href="profile.html">Your profile</a>' +
           '<button class="btn btn--slim" type="button" data-signout>Sign out</button>' +
         "</div>";
-      $("[data-signout]").addEventListener("click", function () {
+      var out = $("[data-signout]");
+      if (out) out.addEventListener("click", function () {
         A.leave().then(function () { location.reload(); });
+      });
+      var again = $("[data-again]");
+      if (again) again.addEventListener("click", function () {
+        again.textContent = "sending…";
+        A.verifyAgain().then(function () { again.textContent = "sent"; },
+                             function (e) { again.textContent = e.message; });
       });
       return;
     }
 
-    $("[data-account-head]").textContent = "Sign in";
+    head.textContent = "Accounts";
     body.innerHTML =
-      '<p class="netline" style="margin-top:0">An account puts you on the ladder, ' +
-        "keeps your games, and has the server referee them — neither player can " +
-        "argue with the result. You can still play a friend without one.</p>" +
-      '<label class="lbl" for="acc-name">Name</label>' +
-      '<input id="acc-name" type="text" data-acc-name autocomplete="username" maxlength="20" />' +
-      '<label class="lbl lbl--spaced" for="acc-pass">Password</label>' +
-      '<input id="acc-pass" type="password" data-acc-pass autocomplete="current-password" />' +
-      '<div class="row-btn" style="margin-top:.7rem">' +
-        '<button class="btn btn--go" type="button" data-signin>Sign in</button>' +
-        '<button class="btn" type="button" data-signup>Create an account</button>' +
-      "</div>" +
-      '<p class="netline" data-acc-said></p>';
-
-    function go(isNew) {
-      var said = $("[data-acc-said]");
-      said.className = "netline";
-      said.textContent = isNew ? "Making your account…" : "Signing in…";
-      A.join($("[data-acc-name]").value, $("[data-acc-pass]").value, isNew)
-        .then(function () { location.reload(); },
-              function (err) {
-                said.className = "netline netline--error";
-                said.textContent = err.message;
-              });
-    }
-    $("[data-signin]").addEventListener("click", function () { go(false); });
-    $("[data-signup]").addEventListener("click", function () { go(true); });
-    $("[data-acc-pass]").addEventListener("keydown", function (ev) {
-      if (ev.key === "Enter") go(false);
-    });
+      "<p>An account puts you on the ladder, keeps your games wherever you sign " +
+      "in, and has the server referee them — so a result is not one player's " +
+      "word. You can play without one.</p>" +
+      '<div class="row-btn">' +
+        '<a class="btn btn--go" style="width:auto" href="account.html">Create an account</a>' +
+        '<a class="btn" href="account.html?in">Sign in</a>' +
+      "</div>";
   }
 
   /* ---- the board in the hero, playing itself ----------------------------- */

@@ -92,6 +92,24 @@ your site data starts you at 1200 again.
 Either way, games against the engine, by message, or across one table are kept
 but never rated, and a game abandoned in the first few moves does not count.
 
+## Accounts
+
+Without a server there are none, and nothing needs one: private rooms, the
+engine and two people at one device all work as they are, and what you play is
+kept in your browser.
+
+With a server, **Create an account** appears in the header. It takes a name, an
+email and a password. The address is only ever used to prove the account is
+yours and to get you back in — proving it is a link good for a day, getting back
+in is a link good for an hour, and asking for one gives the same answer whether
+or not there is an account there. Names that read as lookalikes of each other
+(`husayn`, `hu5ayn`, `hu-sayn`) cannot both exist. Your profile is where you
+change your password or address, or close the account; closing it takes
+everything but the games you played, which were somebody else's games too.
+
+Ratings come in kinds, as on a chess site: an overall one, plus **bullet**,
+**blitz**, **rapid** and **untimed**, each with its own ladder.
+
 ## Resigning, and offering a draw
 
 Both are ordinary parts of a game and neither needs a referee. **Resign** is
@@ -265,6 +283,7 @@ network, and that the computer takes a win when one is on offer.
 | `assets/js/site.js` | The header and foot, and the small shared helpers |
 | `assets/js/app.js` | The board page: drawing it and wiring the controls |
 | `assets/js/account.js` | Talking to the server: requests, and the one live socket |
+| `assets/js/join.js` | The account page: making one, signing in, getting back in |
 | `assets/js/config.js` | Where the server is, if there is one |
 | `server/` | The server: accounts, matchmaking, refereeing, the book |
 | `assets/js/home.js`, `leaderboard.js`, `games.js`, `profile.js` | A page each |

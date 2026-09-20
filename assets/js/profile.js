@@ -279,23 +279,117 @@
     }).join("");
   }
 
-  /* ---- your name ----------------------------------------------------------- */
+  /* ---- looking after your account ------------------------------------------ */
+  /* Everything you can change about yourself, in one place: the name people
+     see, the address that gets you back in, the password, and the way out. */
   function settings(book) {
     var card = $("[data-settings]");
     if (!book.mine) { card.hidden = true; return; }
-    if (book.server) {
-      card.innerHTML =
-        '<div class="card__head"><h2>Your account</h2></div>' +
-        "<p>You are signed in as <b>" + S.esc(book.who.name) + "</b> on " +
-        S.esc(ACC.where().replace(/^https?:\/\//, "")) + ". Your name, rating and " +
-        "games live there, so they follow you to any browser you sign in from.</p>" +
-        '<div class="row-btn"><button class="btn btn--slim" type="button" data-signout>Sign out</button></div>';
-      $("[data-signout]").addEventListener("click", function () {
-        ACC.leave().then(function () { location.href = "index.html"; });
-      });
-      return;
-    }
+    card.hidden = false;
+    if (book.server) return serverSettings();
+    localSettings();
+  }
+
+  function serverSettings() {
+    var me = ACC.me() || {};
+    card().innerHTML =
+      '<div class="card__head"><h2>Your account</h2>' +
+        '<span class="quiet" style="font-size:.78rem">' +
+        S.esc(ACC.where().replace(/^https?:\/\//, "")) + "</span></div>" +
+      "<p>Signed in as <b>" + S.esc(me.name) + "</b>" +
+        (me.email ? " · " + S.esc(me.email) +
+          (me.verified ? '<span class="tag tag--go">proved</span>'
+                       : '<span class="tag">not proved</span>') : "") + "</p>" +
+      (me.email && !me.verified
+        ? '<p class="netline">An address nobody has proved cannot get you back ' +
+          'in. <button class="linkish" type="button" data-again>Send the letter ' +
+          "again</button>.</p>"
+        : "") +
+
+      '<details class="byhand"><summary>Change your password</summary>' +
+        '<label class="lbl lbl--spaced" for="old">Current password</label>' +
+        '<input id="old" type="password" autocomplete="current-password" />' +
+        '<label class="lbl lbl--spaced" for="new">New password</label>' +
+        '<input id="new" type="password" autocomplete="new-password" />' +
+        '<div class="row-btn" style="margin-top:var(--s-3)">' +
+          '<button class="btn" type="button" data-pass>Change it</button></div>' +
+      "</details>" +
+
+      '<details class="byhand"><summary>Change your email</summary>' +
+        '<label class="lbl lbl--spaced" for="mail">New address</label>' +
+        '<input id="mail" type="email" autocomplete="email" />' +
+        '<label class="lbl lbl--spaced" for="sure">Your password</label>' +
+        '<input id="sure" type="password" autocomplete="current-password" />' +
+        '<div class="row-btn" style="margin-top:var(--s-3)">' +
+          '<button class="btn" type="button" data-mail>Change it</button></div>' +
+      "</details>" +
+
+      '<details class="byhand"><summary>Close this account</summary>' +
+        '<p class="netline">Your games stay on file under the name they were ' +
+        "played with. Everything else — the account, its rating, its address — " +
+        "goes, and does not come back.</p>" +
+        '<label class="lbl lbl--spaced" for="bye">Your password</label>' +
+        '<input id="bye" type="password" autocomplete="current-password" />' +
+        '<div class="row-btn" style="margin-top:var(--s-3)">' +
+          '<button class="btn" type="button" data-close>Close it</button></div>' +
+      "</details>" +
+
+      '<p class="netline" data-said></p>' +
+      '<div class="row-btn" style="margin-top:var(--s-3)">' +
+        '<button class="btn btn--slim" type="button" data-signout>Sign out</button></div>';
+
+    var say = function (words, bad) {
+      var el = $("[data-said]");
+      el.textContent = words;
+      el.className = "netline" + (bad ? " netline--error" : " netline--live");
+    };
+
+    $("[data-signout]").addEventListener("click", function () {
+      ACC.leave().then(function () { location.href = "index.html"; });
+    });
+    var again = $("[data-again]");
+    if (again) again.addEventListener("click", function () {
+      ACC.verifyAgain().then(function () { say("Sent. Look in your email."); },
+                             function (e) { say(e.message, true); });
+    });
+    $("[data-pass]").addEventListener("click", function () {
+      ACC.changePassword($("#old").value, $("#new").value).then(function () {
+        say("Changed. Everywhere else is signed out.");
+        $("#old").value = $("#new").value = "";
+      }, function (e) { say(e.message, true); });
+    });
+    $("[data-mail]").addEventListener("click", function () {
+      ACC.changeEmail($("#mail").value, $("#sure").value).then(function (got) {
+        say(got.posted ? "Changed. A letter is on its way to prove it."
+                       : "Changed.");
+        $("#sure").value = "";
+        head(serverBookOf(ACC.me()));
+      }, function (e) { say(e.message, true); });
+    });
+    $("[data-close]").addEventListener("click", function () {
+      if (!confirm("Close this account? It does not come back.")) return;
+      ACC.close($("#bye").value).then(function () { location.href = "index.html"; },
+                                      function (e) { say(e.message, true); });
+    });
+  }
+
+  /* enough of a book to redraw the head after a change */
+  function serverBookOf(me) {
+    return { who: { name: me.name, id: me.id, rating: me.rating, best: me.best,
+                    games: me.games, since: me.since, provisional: me.provisional,
+                    place: me.place },
+             mine: true, server: true,
+             summary: { played: me.games, wins: me.wins, draws: me.draws,
+                        losses: me.losses, rate: me.games
+                          ? Math.round((me.wins + me.draws / 2) / me.games * 100) : 0,
+                        streak: 0, longest: 0, asX: 0, asO: 0, winsAsX: 0, winsAsO: 0 } };
+  }
+
+  function card() { return $("[data-settings]"); }
+
+  function localSettings() {
     var input = $("[data-name]"), said = $("[data-said]");
+    if (!input) return;
     input.value = P.me().name;
     $("[data-save]").addEventListener("click", function () {
       var name = P.rename(input.value);
