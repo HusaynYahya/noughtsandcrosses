@@ -6,7 +6,7 @@
 <meta name="description" content="Every game you have played, with the engine's verdict a click away." />
 <meta name="theme-color" content="#161512" />
 <title>Games · Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/site.css?v=29" />
+<link rel="stylesheet" href="assets/css/site.css?v=30" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body data-page="games">
@@ -39,7 +39,7 @@
         </select>
       </span>
     </div>
-    <div class="scroll">
+    <div class="scroll" data-table-box>
       <table class="tbl">
         <thead><tr>
           <th></th><th>Opponent</th><th>You were</th><th>Moves</th>
@@ -48,19 +48,19 @@
         <tbody data-rows></tbody>
       </table>
     </div>
-    <p class="empty" data-empty hidden>No games yet. <a href="index.html">Find an opponent.</a></p>
-    <div class="row-btn" style="padding:.8rem">
+    <div data-empty></div>
+    <div class="row-btn" style="padding:var(--s-3)" data-tools>
       <button class="btn btn--slim" type="button" data-export>Copy them all as text</button>
       <button class="btn btn--slim" type="button" data-forget>Delete my record</button>
     </div>
   </section>
 </main>
 
-<script src="assets/js/config.js?v=29"></script>
-<script src="assets/js/account.js?v=29"></script>
-<script src="assets/js/player.js?v=29"></script>
-<script src="assets/js/archive.js?v=29"></script>
-<script src="assets/js/site.js?v=29"></script>
-<script src="assets/js/games.js?v=29" defer></script>
+<script src="assets/js/config.js?v=30"></script>
+<script src="assets/js/account.js?v=30"></script>
+<script src="assets/js/player.js?v=30"></script>
+<script src="assets/js/archive.js?v=30"></script>
+<script src="assets/js/site.js?v=30"></script>
+<script src="assets/js/games.js?v=30" defer></script>
 </body>
 </html>

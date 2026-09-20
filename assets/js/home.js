@@ -91,27 +91,114 @@
     });
   }
 
-  /* ---- the decorative board --------------------------------------------- */
-  (function hero() {
-    var box = $("[data-hero]");
-    if (!box) return;
-    /* a position, not a random scatter: crosses have taken the middle board
-       and are a move from the top row of the big one */
-    var shown = { 30: 1, 40: 1, 50: 2, 4: 1, 13: 2, 36: 1, 44: 2, 20: 1, 60: 2,
-                  10: 2, 70: 1, 22: 1, 58: 2, 66: 2, 8: 1 };
-    var html = "";
-    for (var b = 0; b < 9; b++) {
-      html += '<span class="hero__mini' + (b % 2 === 0 ? " hero__mini--light" : "") + '">';
-      for (var c = 0; c < 9; c++) {
-        var at = b * 9 + c, who = shown[at];
-        html += '<span class="hero__cell' + (who === 1 ? " hero__cell--x" :
-                 who === 2 ? " hero__cell--o" : "") + '"></span>';
-      }
-      html += "</span>";
-    }
-    box.innerHTML = html;
-  })();
+  /* ---- the board in the hero, playing itself ----------------------------- */
+  /* Nothing explains the rule like watching it. A mark lands, the small board
+     in that position lights up, and the next mark lands there — so the game is
+     legible in fifteen seconds without a word of instruction.
 
+     The sequence is only a list of squares: the square a mark lands in IS the
+     board the next one goes to, so following the rule is what generates it. */
+  var DEMO = [2, 2, 1, 3, 6, 3, 7, 8, 0, 4, 8, 4, 5, 5];
+  var LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  var MARK = {
+    1: '<svg viewBox="0 0 100 100"><path d="M26 26l48 48M74 26l-48 48"/></svg>',
+    2: '<svg viewBox="0 0 100 100"><path d="M50 23a27 27 0 1 1 0 54 27 27 0 1 1 0-54"/></svg>'
+  };
+
+  function won(mini, who) {
+    return LINES.some(function (l) {
+      return l.every(function (i) { return mini[i] === who; });
+    });
+  }
+
+  function hero() {
+    var box = $("[data-hero]"), cap = $("[data-hero-cap]");
+    if (!box) return;
+
+    var cells = [];
+    for (var b = 0; b < 9; b++) {
+      var mini = document.createElement("span");
+      mini.className = "hero__mini" + (b % 2 === 0 ? " hero__mini--light" : "");
+      for (var c = 0; c < 9; c++) {
+        var cell = document.createElement("span");
+        cell.className = "hero__cell";
+        mini.appendChild(cell);
+        cells.push(cell);
+      }
+      box.appendChild(mini);
+    }
+    var minis = Array.prototype.slice.call(box.children);
+    var still = window.matchMedia &&
+                window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var grid, board, turn, at, timer = null;
+
+    function clear() {
+      grid = [];
+      for (var b = 0; b < 9; b++) grid.push([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      cells.forEach(function (c) { c.className = "hero__cell"; c.innerHTML = ""; });
+      minis.forEach(function (m, i) {
+        m.className = "hero__mini" + (i % 2 === 0 ? " hero__mini--light" : "");
+      });
+      board = 4; turn = 1; at = 0;
+      light();
+    }
+
+    function light() {
+      minis.forEach(function (m, i) { m.classList.toggle("hero__mini--live", i === board); });
+    }
+
+    /* one move, and where it sends the next one */
+    function place(fresh) {
+      var c = DEMO[at++];
+      var cell = cells[board * 9 + c];
+      grid[board][c] = turn;
+      cell.className = "hero__cell hero__cell--" + (turn === 1 ? "x" : "o") +
+                       (fresh ? " hero__cell--new" : "");
+      cell.innerHTML = MARK[turn];
+      if (won(grid[board], turn)) {
+        minis[board].classList.add("hero__mini--won",
+          turn === 1 ? "hero__mini--x" : "hero__mini--o");
+      }
+      board = c;
+      turn = turn === 1 ? 2 : 1;
+      light();
+    }
+
+    function step() {
+      if (at >= DEMO.length) {
+        cap.textContent = "Crosses have taken the middle board";
+        timer = setTimeout(function () {
+          cap.textContent = "A game, playing itself";
+          clear();
+          timer = setTimeout(step, 700);
+        }, 2400);
+        return;
+      }
+      var who = turn === 1 ? "Crosses" : "Noughts";
+      place(true);
+      cap.textContent = who + " played — the lit board is where the reply must go";
+      timer = setTimeout(step, 1050);
+    }
+
+    clear();
+    if (still) {
+      while (at < DEMO.length) place(false);
+      cap.textContent = "The square you take decides where they play next";
+      return;
+    }
+    timer = setTimeout(step, 450);
+    document.addEventListener("visibilitychange", function () {
+      clearTimeout(timer);
+      if (!document.hidden) timer = setTimeout(step, 600);
+    });
+  }
+
+  /* the little line drawings on the three ways in */
+  function icons() {
+    document.querySelectorAll("[data-icon]").forEach(function (el) {
+      el.innerHTML = S.icon(el.getAttribute("data-icon"));
+    });
+  }
   /* ---- you -------------------------------------------------------------- */
   function drawYou() {
     var me = P.who(), sum = ARCH.summary();
@@ -147,7 +234,13 @@
   /* ---- your last games --------------------------------------------------- */
   function drawRecent() {
     var games = ARCH.all().slice(0, 6), body = $("[data-recent]");
-    $("[data-recent-empty]").hidden = games.length > 0;
+    $("[data-recent-empty]").innerHTML = games.length ? "" : S.nothing("board",
+      "No games yet",
+      "Everything you finish is kept here — the moves, who it was against, and " +
+      "what it did to your rating. You can open any of them again and have the " +
+      "engine go over it with you.",
+      '<a class="btn btn--go" style="width:auto" href="play.html?mode=computer">' +
+        "Play your first</a>");
     body.innerHTML = games.map(function (g) {
       var mark = g.result === "win" ? '<span class="w">won</span>'
                : g.result === "loss" ? '<span class="l">lost</span>'
@@ -168,7 +261,16 @@
   /* ---- the top of the table ---------------------------------------------- */
   function drawTop() {
     var rows = P.table().slice(0, 6);
-    $("[data-top]").innerHTML = rows.map(function (r) {
+    var alone = rows.length < 2;
+    $("[data-top-empty]").innerHTML = alone ? S.nothing("people",
+      "Just you so far",
+      "Everybody you play turns up here, with the record between you. Beat " +
+      "somebody rated and the points move from them to you.",
+      '<button class="btn btn--go" style="width:auto" type="button" data-quick-2>' +
+        "Find an opponent</button>") : "";
+    var alt = document.querySelector("[data-quick-2]");
+    if (alt) alt.addEventListener("click", quick);
+    $("[data-top]").innerHTML = (alone ? [] : rows).map(function (r) {
       return "<tr" + (r.you ? ' class="you"' : "") + '><td class="num quiet">' + r.place + "</td>" +
         '<td><span class="name">' + S.face(r) + S.esc(r.name) + "</span></td>" +
         '<td class="num">' + r.rating + (r.provisional ? "?" : "") + "</td>" +
@@ -179,10 +281,25 @@
   /* ---- the lobby ---------------------------------------------------------- */
   function drawSeeks(list, count) {
     offers = list;
-    lobbyCount.textContent = count ? S.plural(count, "player") + " here" : "";
-    lobbyDot.className = "dot " + (lobby && lobby.connected() ? "dot--on" : "dot--off");
+    lobbyCount.textContent = count ? "· " + S.plural(count, "player") + " here" : "";
+    lobbyDot.className = "dot " + ((onServer ? sock && sock.live() : lobby && lobby.connected())
+      ? "dot--on" : "dot--off");
     seeksTable.hidden = !list.length;
-    seeksEmpty.hidden = !!list.length;
+    seeksEmpty.innerHTML = list.length ? "" : S.nothing("clock",
+      "Nobody is waiting just now",
+      "Leave an offer and the next person here walks straight into your game — " +
+      "it takes one click, and you can play the engine while you wait.",
+      '<button class="btn btn--go" type="button" data-offer-empty style="width:auto">' +
+        "Offer a game</button>" +
+      '<a class="btn" href="play.html?mode=computer">Play the engine</a>');
+    var alt = document.querySelector("[data-offer-empty]");
+    if (alt) alt.addEventListener("click", offer);
+    var ways = document.querySelector("[data-ways-lobby]");
+    if (ways) {
+      ways.textContent = list.length
+        ? S.plural(list.length, "game") + " waiting to be taken"
+        : "Leave an offer; the next person takes it";
+    }
     seeksBody.innerHTML = list.map(function (s, i) {
       return '<tr><td><span class="name">' + S.face(s.who) + S.esc(s.who.name) + "</span></td>" +
         '<td class="num">' + (s.who.rating || "—") + "</td>" +
@@ -235,14 +352,16 @@
     location.href = url;
   }
 
-  $("[data-offer]").addEventListener("click", offer);
-  $("[data-lobby-refresh]").addEventListener("click", offer);
-
   /* one button that does whatever is sensible: take the longest-waiting offer
      if there is one, otherwise leave one of your own */
-  $("[data-quick]").addEventListener("click", function () {
+  function quick() {
     if (offers.length) accept(offers[0]);
     else offer();
+  }
+
+  $("[data-offer]").addEventListener("click", offer);
+  document.querySelectorAll("[data-quick]").forEach(function (b) {
+    b.addEventListener("click", quick);
   });
 
   $("[data-join-form]").addEventListener("submit", function (ev) {
@@ -258,7 +377,9 @@
      server pairs you and referees what follows. */
   function serverLobby() {
     onServer = true;
-    $("[data-lobby-name]").textContent = "Open games on the server";
+    $("[data-lobby-name]").textContent = "Open games";
+    var top = $("[data-top-name]");
+    if (top) top.textContent = "The ladder";
     lobbyStatus.textContent = "Reaching the server…";
 
     sock = A.socket({
@@ -296,6 +417,9 @@
 
   /* ---- go ----------------------------------------------------------------- */
   S.ready(function () {
+    icons();
+    hero();
+    drawSeeks([], 0);          /* something to look at before the lobby answers */
     drawAccount();
     drawYou();
     drawRecent();

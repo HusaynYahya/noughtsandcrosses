@@ -3,44 +3,92 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play a stranger in the open lobby, a friend in a private room, or the engine that taught itself." />
-<meta name="theme-color" content="#161512" />
-<title>Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/site.css?v=29" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
+<meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play a stranger in the open lobby, a friend in a private room, or an engine that taught itself. No account needed to start." />
+<meta name="theme-color" content="#14140f" />
+<meta property="og:title" content="Ultimate noughts and crosses" />
+<meta property="og:description" content="Nine boards inside one. The square you take decides which board your opponent must play in next." />
+<meta property="og:type" content="website" />
+<title>Ultimate Noughts and Crosses — nine boards inside one</title>
+<link rel="stylesheet" href="assets/css/site.css?v=30" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%2383bd36' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body data-page="home">
 <a class="skip-link" href="#main">Skip to the lobby</a>
 
 <main class="page" id="main">
 
-  <div class="hero">
-    <div class="hero__text">
-      <h1>Nine boards inside one</h1>
-      <p>Every move you make sends your opponent to the small board in the matching
-         square. Win three small boards in a line to win the game. Play someone
-         waiting in the lobby, invite a friend to a private room, or take on the
-         engine that taught itself.</p>
+  <!-- ------------------------------------------------------------- the hero -->
+  <section class="hero">
+    <div class="hero__text rise">
+      <p class="hero__eyebrow">Nine boards inside one</p>
+      <h1>The square you take decides <b>where they play next</b>.</h1>
+      <p class="hero__lede">Win a small board to claim its square on the big one;
+        three in a row wins the game. Every move is two decisions — what it does
+        here, and where it sends your opponent.</p>
       <div class="hero__go">
         <button class="btn btn--go btn--big" type="button" data-quick>Find an opponent</button>
         <a class="btn btn--big" href="play.html?mode=computer">Play the engine</a>
-        <a class="btn btn--big" href="play.html?mode=local">One device, two people</a>
       </div>
-      <p class="netline" data-lobby-status>Reaching the lobby…</p>
+      <p class="hero__note" data-lobby-status>Reaching the lobby…</p>
     </div>
-    <a class="hero__board" href="play.html" aria-label="Play">
-      <span class="hero__grid" data-hero aria-hidden="true"></span>
-    </a>
-  </div>
 
-  <div class="cols cols--side">
+    <div class="hero__board rise rise-2">
+      <div class="hero__grid" data-hero aria-hidden="true"></div>
+      <p class="hero__cap" data-hero-cap>A game, playing itself</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------ three ways in -->
+  <section class="section" style="margin-top:0">
+    <div class="ways">
+      <button class="pick pick--go" type="button" data-quick>
+        <span class="pick__mark" data-icon="people"></span>
+        <span><b>Play a stranger</b><span data-ways-lobby>Someone waiting in the lobby, rated</span></span>
+      </button>
+      <a class="pick" href="play.html?mode=online&amp;host=1">
+        <span class="pick__mark" data-icon="link"></span>
+        <span><b>Play a friend</b><span>A private room, four words to share</span></span>
+      </a>
+      <a class="pick" href="play.html?mode=computer">
+        <span class="pick__mark" data-icon="robot"></span>
+        <span><b>Play the engine</b><span>It taught itself, and will explain afterwards</span></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the lobby -->
+  <div class="cols cols--side section">
     <section class="card card--flush">
-      <div class="card__head" style="padding: 1rem 1rem 0">
+      <div class="card__head" style="padding:var(--s-4) var(--s-4) 0">
         <h2><span data-lobby-name>Open games</span>
           <span class="dot dot--off" data-lobby-dot></span>
           <span data-lobby-count class="quiet"></span></h2>
-        <button class="linkish" type="button" data-lobby-refresh>Offer a game</button>
+        <span class="quiet" style="font-size:.8rem">Anyone can take one</span>
       </div>
+
+      <div class="lobbybar">
+        <div>
+          <label class="lbl" for="seek-tc">Clock</label>
+          <select id="seek-tc" data-seek-tc>
+            <option value="0">No clock</option>
+            <option value="60+0">1 + 0 · bullet</option>
+            <option value="180+2">3 + 2 · blitz</option>
+            <option value="300+3" selected>5 + 3 · blitz</option>
+            <option value="600+0">10 + 0 · rapid</option>
+            <option value="move:300">5 minutes a move</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl" for="seek-side">Your side</label>
+          <select id="seek-side" data-seek-side>
+            <option value="either" selected>Either</option>
+            <option value="X">Crosses, first</option>
+            <option value="O">Noughts, second</option>
+          </select>
+        </div>
+        <button class="btn" type="button" data-offer>Offer a game</button>
+      </div>
+
       <div class="scroll">
         <table class="tbl" data-seeks-table hidden>
           <thead><tr>
@@ -50,45 +98,25 @@
           <tbody data-seeks></tbody>
         </table>
       </div>
-      <p class="empty" data-seeks-empty>Nobody is waiting for a game right now.
-        Offer one and the next person here will see it.</p>
+      <div data-seeks-empty></div>
     </section>
 
     <div class="stack">
       <section class="card" data-account hidden>
         <div class="card__head"><h2 data-account-head>Your account</h2>
-          <span class="quiet" style="font-size:.76rem" data-account-where></span></div>
+          <span class="quiet" style="font-size:.78rem" data-account-where></span></div>
         <div data-account-body></div>
       </section>
 
-      <section class="card">
-        <div class="card__head"><h2>Offer a game</h2></div>
-        <label class="lbl" for="seek-tc">Clock</label>
-        <select id="seek-tc" data-seek-tc>
-          <option value="0">No clock</option>
-          <option value="60+0">1 + 0 · bullet</option>
-          <option value="180+2">3 + 2 · blitz</option>
-          <option value="300+3" selected>5 + 3 · blitz</option>
-          <option value="600+0">10 + 0 · rapid</option>
-          <option value="move:300">5 minutes a move</option>
-        </select>
-        <label class="lbl lbl--spaced" for="seek-side">Your side</label>
-        <select id="seek-side" data-seek-side>
-          <option value="either" selected>Either</option>
-          <option value="X">Crosses, first</option>
-          <option value="O">Noughts, second</option>
-        </select>
-        <div class="row-btn" style="margin-top:.7rem">
-          <button class="btn btn--go" type="button" data-offer>Offer it</button>
-        </div>
-        <p class="netline">Your name and rating are shown in the lobby while you are
-          waiting. Private rooms never appear here.</p>
+      <section class="card" data-you>
+        <div class="card__head"><h2>You</h2><a href="profile.html">Profile</a></div>
+        <div data-you-body></div>
       </section>
 
       <section class="card">
         <div class="card__head"><h2>Play a friend</h2></div>
         <p>Make a code, send it however you like, and you are in a private room
-           nobody else can see.</p>
+           nobody else can see — no account either side.</p>
         <div class="row-btn">
           <a class="btn btn--go" href="play.html?mode=online&amp;host=1">Make a room</a>
         </div>
@@ -98,41 +126,90 @@
           <button class="btn" type="submit">Go</button>
         </form>
       </section>
-
-      <section class="card" data-you>
-        <div class="card__head"><h2>You</h2><a href="profile.html">Profile</a></div>
-        <div data-you-body></div>
-      </section>
     </div>
   </div>
 
-  <div class="cols cols--2" style="margin-top:.9rem">
+  <!-- ------------------------------------------------------ how it works -->
+  <section class="section">
+    <div class="section__head">
+      <h2>How it works</h2>
+      <p><a href="learn.html">The rules in full, and what to aim for →</a></p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="step__n">1</span>
+        <b>Play a square</b>
+        <p>The nine small boards sit inside one big one. You start anywhere.</p>
+      </div>
+      <div class="step">
+        <span class="step__n">2</span>
+        <b>Send them somewhere</b>
+        <p>Where your mark lands <em>inside</em> its small board is the board
+           your opponent must play in next. Top right sends them to the top-right
+           board.</p>
+      </div>
+      <div class="step">
+        <span class="step__n">3</span>
+        <b>Win three boards in a row</b>
+        <p>A won board still gets played in while it has squares left — which is
+           how you steer somebody where you want them.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- --------------------------------------------------- record and ladder -->
+  <div class="cols cols--2 section">
     <section class="card card--flush">
-      <div class="card__head" style="padding:1rem 1rem 0">
+      <div class="card__head" style="padding:var(--s-4) var(--s-4) 0">
         <h2>Your last games</h2><a href="games.html">All games</a>
       </div>
       <div class="scroll"><table class="tbl"><tbody data-recent></tbody></table></div>
-      <p class="empty" data-recent-empty hidden>No games yet. The first one is above.</p>
+      <div data-recent-empty></div>
     </section>
 
     <section class="card card--flush">
-      <div class="card__head" style="padding:1rem 1rem 0">
-        <h2>Leaderboard</h2><a href="leaderboard.html">The whole table</a>
+      <div class="card__head" style="padding:var(--s-4) var(--s-4) 0">
+        <h2><span data-top-name>Leaderboard</span></h2>
+        <a href="leaderboard.html">The whole table</a>
       </div>
       <div class="scroll"><table class="tbl"><tbody data-top></tbody></table></div>
+      <div data-top-empty></div>
     </section>
   </div>
 
+  <!-- ------------------------------------------------------------ the engine -->
+  <section class="section">
+    <div class="card engine-strip">
+      <div>
+        <h2 style="margin:0 0 var(--s-2);font-size:1.2rem">The engine taught itself</h2>
+        <p style="color:var(--text-dim)">It played itself several hundred thousand
+          times, learned which moves were worth looking at, and kept what worked.
+          When your game ends it will go back over it with you — every inaccuracy,
+          mistake and blunder, and the line it would have played instead.</p>
+        <div class="row-btn">
+          <a class="btn btn--slim" href="paper.html">Read the write-up</a>
+          <a class="btn btn--slim" href="progress.html">See it learning</a>
+          <a class="btn btn--slim" href="play.html?mode=computer">Play it</a>
+        </div>
+      </div>
+      <div class="facts facts--three" style="border:0;padding:0">
+        <div class="fact"><b>89%</b><span>against its first self</span></div>
+        <div class="fact"><b>8</b><span>generations kept</span></div>
+        <div class="fact"><b>46k</b><span>positions a second</span></div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
-<script src="assets/js/config.js?v=29"></script>
-<script src="assets/js/account.js?v=29"></script>
-<script src="assets/js/player.js?v=29"></script>
-<script src="assets/js/archive.js?v=29"></script>
-<script src="assets/js/site.js?v=29"></script>
-<script src="assets/js/net.js?v=29"></script>
-<script src="assets/js/live.js?v=29"></script>
-<script src="assets/js/lobby.js?v=29"></script>
-<script src="assets/js/home.js?v=29" defer></script>
+<script src="assets/js/config.js?v=30"></script>
+<script src="assets/js/account.js?v=30"></script>
+<script src="assets/js/player.js?v=30"></script>
+<script src="assets/js/archive.js?v=30"></script>
+<script src="assets/js/site.js?v=30"></script>
+<script src="assets/js/net.js?v=30"></script>
+<script src="assets/js/live.js?v=30"></script>
+<script src="assets/js/lobby.js?v=30"></script>
+<script src="assets/js/home.js?v=30" defer></script>
 </body>
 </html>

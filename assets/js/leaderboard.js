@@ -49,9 +49,13 @@
         '<td class="num l">' + r.losses + "</td>" +
         '<td class="num">' + (r.games ? Math.round((r.wins + r.draws / 2) / r.games * 100) + "%" : "—") + "</td>" +
         '<td class="quiet">' + S.esc(r.online ? "now" : S.ago(r.seen)) + "</td></tr>";
-    }).join("") ||
-      '<tr><td colspan="9" class="empty">Nobody has finished a rated game here yet. ' +
-      'Be the first — the lobby is on the <a href="index.html">front page</a>.</td></tr>';
+    }).join("");
+    document.querySelector("[data-table-box]").hidden = !rows.length;
+    document.querySelector("[data-empty]").innerHTML = rows.length ? "" : S.nothing("people",
+      "Nobody has finished a rated game here yet",
+      "Be the first. Every rated game on this server is refereed by it, so what " +
+      "ends up in this table is not anybody's word for it.",
+      '<a class="btn btn--go" style="width:auto" href="index.html">Find an opponent</a>');
   }
 
   function draw() {
@@ -73,7 +77,16 @@
       tile(sum.rate + "%", "your score", sum.wins + " won, " + sum.draws + " drawn") +
       tile(Object.keys(online).length, "online now", "in the lobby");
 
-    document.querySelector("[data-table]").innerHTML = rows.map(function (r) {
+    var alone = rows.filter(function (r) { return r.games; }).length === 0;
+    document.querySelector("[data-table-box]").hidden = alone;
+    document.querySelector("[data-empty]").innerHTML = alone ? S.nothing("people",
+      "Nobody has played yet",
+      "This table fills itself in as you play. Beat somebody and their points " +
+      "come to you; lose and they go the other way. Games against the engine " +
+      "are kept, but they are not rated.",
+      '<a class="btn btn--go" style="width:auto" href="index.html">Find an opponent</a>' +
+      '<a class="btn" href="play.html?mode=computer">Play the engine</a>') : "";
+    document.querySelector("[data-table]").innerHTML = (alone ? [] : rows).map(function (r) {
       var here = online[r.id] || r.you;
       return "<tr" + (r.you ? ' class="you"' : "") + ">" +
         '<td class="num quiet">' + r.place + "</td>" +

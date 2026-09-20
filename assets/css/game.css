@@ -37,6 +37,7 @@
 
 /* ---- player strips ---------------------------------------------------- */
 .seat {
+  border-radius: var(--r);
   display: flex; align-items: center; gap: .65rem;
   background: var(--panel); border: 1px solid transparent;
   border-left: 3px solid transparent;
@@ -220,6 +221,7 @@
 
 /* ---- status ----------------------------------------------------------- */
 .status {
+  border-radius: var(--r);
   display: flex; align-items: center; gap: .55rem;
   margin: .1rem 0 0; min-height: 2.6em;
   font-size: .86rem; color: var(--text);
@@ -234,9 +236,17 @@
 .status.is-over { color: var(--text-strong); font-weight: 600; }
 
 /* ---- sidebar ---------------------------------------------------------- */
-.side { display: grid; gap: .55rem; align-content: start; min-width: 0; }
-.side__block { background: var(--panel); border: 1px solid var(--line); padding: .8rem; }
-.side__block--flush { padding: 0; }
+.side { display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+.side__block {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: var(--s-4); box-shadow: var(--lift); position: relative;
+}
+.side__block::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 1px;
+  background: var(--edge); border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.side__block--flush { padding: 0; overflow: hidden; }
 
 
 .netcheck { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .74rem; line-height: 1.45; }
@@ -270,6 +280,7 @@
 
 /* ---- move list -------------------------------------------------------- */
 .moves {
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
   max-height: 13rem; overflow-y: auto; overscroll-behavior: contain;
   font-family: var(--mono); font-size: .82rem;
 }

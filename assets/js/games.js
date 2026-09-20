@@ -52,7 +52,18 @@
       tile(sum.longest, "best run", sum.streak ? "on " + sum.streak + " now" : "") +
       tile(sum.averageLength, "moves a game", sum.byTime ? sum.byTime + " on time" : "");
 
-    emptyEl.hidden = list.length > 0;
+    document.querySelector("[data-table-box]").hidden = !list.length;
+    document.querySelector("[data-tools]").hidden = !all.length;
+    emptyEl.innerHTML = list.length ? "" : S.nothing("board",
+      all.length ? "Nothing matches that" : "No games yet",
+      all.length
+        ? "Try another filter — everything you have played is in here somewhere."
+        : "Every game you finish is written down here: the moves, who it was " +
+          "against, how it ended and what it did to your rating. Any of them " +
+          "opens again on the board with the engine beside it.",
+      all.length ? "" :
+        '<a class="btn btn--go" style="width:auto" href="index.html">Find an opponent</a>' +
+        '<a class="btn" href="play.html?mode=computer">Play the engine</a>');
     rowsEl.innerHTML = list.map(function (g) {
       var out = g.result === "win" ? '<span class="w">won</span>'
               : g.result === "loss" ? '<span class="l">lost</span>'

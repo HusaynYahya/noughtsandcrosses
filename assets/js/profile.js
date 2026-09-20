@@ -149,9 +149,14 @@
   function ratingLine(book) {
     var line = book.line, box = $("[data-rating]");
     if (line.length < 2) {
-      box.innerHTML = '<p class="empty">A rating is drawn here once there are ' +
-        "rated games to draw it from.</p>";
+      box.innerHTML = S.nothing("chart", "No rated games yet",
+        "Your rating is drawn here game by game. Only games against another " +
+        "person count — the engine will play you all day, but it will not move " +
+        "your rating.",
+        book.mine ? '<a class="btn btn--go" style="width:auto" href="index.html">' +
+                    "Find an opponent</a>" : "");
       $("[data-rating-range]").textContent = "";
+      $("[data-rating-cap]").hidden = true;
       return;
     }
     var W = 520, H = 190, L = 34, R = 12, T = 12, B = 20;
@@ -162,6 +167,7 @@
     var x = function (i) { return L + i / (line.length - 1) * (W - L - R); };
     var y = function (v) { return T + (high - v) / (high - low) * (H - T - B); };
 
+    $("[data-rating-cap]").hidden = false;
     var ticks = [], stepAt = niceStep(high - low);
     for (var t = Math.ceil(low / stepAt) * stepAt; t <= high; t += stepAt) ticks.push(t);
 
@@ -215,6 +221,13 @@
   /* ---- how much playing has been going on --------------------------------- */
   function activity(book) {
     var days = book.days, box = $("[data-activity]");
+    if (!book.summary.played) {
+      box.innerHTML = S.nothing("clock", "Nothing played yet",
+        "Every game you finish puts a bar on this chart, so a month of playing " +
+        "is one glance.",
+        book.mine ? '<a class="btn" href="play.html?mode=computer">Play the engine</a>' : "");
+      return;
+    }
     var most = Math.max(1, Math.max.apply(null, days.map(function (d) { return d.games; })));
     var W = 520, H = 190, L = 24, R = 8, T = 12, B = 22;
     var slot = (W - L - R) / days.length;
@@ -247,7 +260,13 @@
   /* ---- who they have played ------------------------------------------------ */
   function rivals(book) {
     var rows = book.rivals || [];
-    $("[data-rivals-empty]").hidden = rows.length > 0;
+    $("[data-rivals-box]").hidden = !rows.length;
+    $("[data-rivals-empty]").innerHTML = rows.length ? "" : S.nothing("people",
+      "No opponents yet",
+      "Everybody you play ends up here with the record between you — how many " +
+      "each way, and what they are rated now.",
+      book.mine ? '<a class="btn btn--go" style="width:auto" href="index.html">' +
+                  "Find an opponent</a>" : "");
     $("[data-rivals]").innerHTML = rows.map(function (r) {
       return '<tr><td><span class="name">' + S.face(r) +
           (book.server ? '<a href="profile.html?player=' + encodeURIComponent(r.name) + '">' +

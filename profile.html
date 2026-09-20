@@ -6,7 +6,7 @@
 <meta name="description" content="Your rating, your record and everybody you have played." />
 <meta name="theme-color" content="#161512" />
 <title>Profile · Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/site.css?v=29" />
+<link rel="stylesheet" href="assets/css/site.css?v=30" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body data-page="profile">
@@ -16,7 +16,7 @@
 
   <div class="tiles" style="margin-top:1rem" data-tiles></div>
 
-  <div class="cols cols--2" style="margin-top:.9rem">
+  <div class="cols cols--2 section" style="align-items:stretch">
     <section class="card">
       <div class="card__head">
         <h2>Rating, game by game</h2>
@@ -37,16 +37,15 @@
     </section>
   </div>
 
-  <div class="cols cols--2" style="margin-top:.9rem">
+  <div class="cols cols--2 section">
     <section class="card card--flush">
       <div class="card__head" style="padding:1rem 1rem 0"><h2>People you have played</h2></div>
-      <div class="scroll"><table class="tbl">
+      <div class="scroll" data-rivals-box><table class="tbl">
         <thead><tr><th>Player</th><th class="num">Rating</th><th class="num">Games</th>
           <th>Head to head</th><th>Last</th></tr></thead>
         <tbody data-rivals></tbody>
       </table></div>
-      <p class="empty" data-rivals-empty hidden>Nobody yet. The lobby is on the
-        <a href="index.html">front page</a>.</p>
+      <div data-rivals-empty></div>
     </section>
 
     <section class="card" data-settings>
@@ -67,11 +66,11 @@
 
 </main>
 
-<script src="assets/js/config.js?v=29"></script>
-<script src="assets/js/account.js?v=29"></script>
-<script src="assets/js/player.js?v=29"></script>
-<script src="assets/js/archive.js?v=29"></script>
-<script src="assets/js/site.js?v=29"></script>
-<script src="assets/js/profile.js?v=29" defer></script>
+<script src="assets/js/config.js?v=30"></script>
+<script src="assets/js/account.js?v=30"></script>
+<script src="assets/js/player.js?v=30"></script>
+<script src="assets/js/archive.js?v=30"></script>
+<script src="assets/js/site.js?v=30"></script>
+<script src="assets/js/profile.js?v=30" defer></script>
 </body>
 </html>
