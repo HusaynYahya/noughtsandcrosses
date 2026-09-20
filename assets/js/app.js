@@ -83,6 +83,10 @@
      afterwards. Nobody can vouch for it but them — see the note in the README
      about what a rating means here. */
   var them = null;
+  /* how the game ended, when it was not decided on the board */
+  var endedHow = "";
+  /* a draw offered: "mine" while we wait on them, "theirs" while they wait on us */
+  var offered = "";
   var P = window.UNC.player, ARCH = window.UNC.archive, SITE = window.UNC.site;
   function newGid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -133,6 +137,13 @@
       backBtn      = $("[data-explore-back]"),
       doneBtn      = $("[data-explore-done]"),
       playControls = $("[data-play-controls]"),
+      gameActs     = $("[data-game-acts]"),
+      resignBtn    = $("[data-resign]"),
+      drawBtn      = $("[data-draw]"),
+      offerRow     = $("[data-offer-row]"),
+      offerText    = $("[data-offer-text]"),
+      offerYes     = $("[data-offer-yes]"),
+      offerNo      = $("[data-offer-no]"),
       netCheckBtn = $("[data-net-check]"),
       netCheckOut = $("[data-net-check-out]"),
       netReport   = $("[data-net-report]"),
@@ -295,6 +306,7 @@
   }
 
   function advance(move) {
+    if (offered) { offered = ""; }
     past.push({ s: E.pack(state), c: [clock.left[X], clock.left[O]] });
     moves.push(move);
     analysisNote(moves.length - 1);
@@ -335,7 +347,7 @@
       mode: mode,
       result: score === 1 ? "win" : score === 0 ? "loss" : "draw",
       side: mine || X,
-      ending: clock.flagged ? "time" : "board",
+      ending: endedHow || (clock.flagged ? "time" : "board"),
       moves: E.packMoves(moves),
       plies: moves.length,
       opponent: rival ? { id: rival.id, name: rival.name, rating: rival.rating }
@@ -349,6 +361,86 @@
     renderSeats();
   }
   var lastResult = null;
+
+  /* ---- resigning, and offering a draw ---------------------------------- */
+  /* Both are ordinary parts of a game and neither needs a referee: a
+     resignation is one player's to give, and a draw is only a draw once the
+     other has said yes. */
+  function canAct() {
+    if (state.over || explore.on || review.on || !moves.length) return false;
+    if (mode === "online") return !!(net && net.connected());
+    return mode === "computer";
+  }
+
+  function resign() {
+    if (!canAct()) return;
+    if (!confirm("Resign this game?")) return;
+    var mine = seatHome();
+    endGame(mine === X ? O : X, "resign");
+    if (mode === "online") net.send({ t: "resign" });
+  }
+
+  function theyResigned() {
+    if (state.over) return;
+    endGame(seatHome(), "resign");
+    say("note", (them ? them.name : "Your friend") + " resigned.");
+  }
+
+  function offerDraw() {
+    if (!canAct() || mode !== "online") return;
+    offered = "mine";
+    net.send({ t: "draw", offer: true });
+    say("me", "Draw?");
+    render();
+  }
+
+  function theyOfferDraw() {
+    if (state.over || mode !== "online") return;
+    offered = "theirs";
+    say("them", "Draw?");
+    render();
+  }
+
+  function answerDraw(yes) {
+    if (offered !== "theirs") return;
+    offered = "";
+    net.send({ t: "draw", agree: !!yes });
+    if (yes) endGame(0, "agreed");
+    else say("me", "No — play on.");
+    render();
+  }
+
+  function drawAgreed(yes) {
+    if (offered !== "mine") return;
+    offered = "";
+    if (yes) endGame(0, "agreed");
+    else say("note", "Your draw offer was declined.");
+    render();
+  }
+
+  /* settle the game without a move: `winner` is 0 for a draw */
+  function endGame(winner, how) {
+    endedHow = how;
+    offered = "";
+    clockStop();
+    state.over = true;
+    state.winner = winner;
+    state.winLine = null;
+    render();
+    finishGame();
+    keepGame();
+    if (mode === "online" && net && net.role === "host") broadcast();
+  }
+
+  function renderActs() {
+    var can = canAct();
+    gameActs.hidden = !(mode === "online" || mode === "computer") || review.on || explore.on;
+    resignBtn.disabled = !can;
+    drawBtn.disabled = !can || mode !== "online" || offered === "mine";
+    drawBtn.textContent = offered === "mine" ? "Draw offered" : "Offer a draw";
+    offerRow.hidden = offered !== "theirs" || state.over;
+    offerText.textContent = (them ? them.name : "Your friend") + " offers a draw.";
+  }
 
   /* ---- the computer ---------------------------------------------------- */
   function computerTurn() {
@@ -897,6 +989,7 @@
     renderMoves();
     renderSeats();
     renderExplore();
+    renderActs();
     renderReview();
     renderPost();
     renderClocks();
@@ -1036,7 +1129,12 @@
 
     if (state.over) {
       dot = "none";
-      text = !state.winner
+      var loser = state.winner === X ? O : X;
+      text = endedHow === "agreed"
+        ? "A draw, agreed between you."
+        : endedHow === "resign"
+          ? SIDE[state.winner] + " win — " + SIDE[loser].toLowerCase() + " resigned."
+        : !state.winner
         ? "A drawn game — every square filled, nobody with three boards in a row."
         : clock.flagged
           ? SIDE[state.winner] + " win — " + SIDE[clock.flagged].toLowerCase() +
@@ -1073,6 +1171,8 @@
     if (review.on) { review.on = false; review.done = false; review.scores = []; }
     analysis.marks = [];
     state = E.create();
+    endedHow = "";
+    offered = "";
     gid = newGid();
     past = [];
     moves = [];
@@ -1158,6 +1258,7 @@
      have to work out between them which of them still knows the game. */
   function record(t) {
     return { t: t, gid: gid, ply: moves.length, at: Date.now(), counted: counted,
+             how: endedHow,
              state: E.pack(state), moves: moves.slice(), seat: seat,
              tally: tally,
              clock: { on: clock.on, mode: clock.mode, base: clock.base,
@@ -1199,6 +1300,7 @@
     if (explore.on) explore.on = false;
     if (review.on) { review.on = false; review.done = false; review.scores = []; }
     gid = rec.gid || newGid();
+    endedHow = typeof rec.how === "string" ? rec.how : "";
     state = E.unpack(rec.state);
     moves = rec.moves.slice();
     if (rec.seat === X || rec.seat === O) seat = rec.seat;
@@ -1315,6 +1417,12 @@
       meetThem(msg.who);
       return;
     }
+    if (msg.t === "resign") { theyResigned(); return; }
+    if (msg.t === "draw") {
+      if (msg.offer) theyOfferDraw();
+      else drawAgreed(!!msg.agree);
+      return;
+    }
     if (net.role === "host") {
       if (msg.t === "hello" || msg.t === "resume") {
         /* They still have the game and we do not — the usual shape of a
@@ -1366,6 +1474,9 @@
   function applySync(msg) {
     gid = msg.gid || gid;
     startedHere = false;
+    /* a game can end without a move — a resignation, a draw agreed — and the
+       copy that arrives has to say which, or it reads as a win on the board */
+    endedHow = typeof msg.how === "string" ? msg.how : "";
     seat = msg.seat === O ? O : X;
     state = E.unpack(msg.state);
     if (msg.tally) { tally = msg.tally; renderTally(); }
@@ -1781,6 +1892,10 @@
       reset(false);
     });
     undoBtn.addEventListener("click", undo);
+    resignBtn.addEventListener("click", resign);
+    drawBtn.addEventListener("click", offerDraw);
+    offerYes.addEventListener("click", function () { answerDraw(true); });
+    offerNo.addEventListener("click", function () { answerDraw(false); });
     exploreBtn.addEventListener("click", exploreEnter);
     backBtn.addEventListener("click", exploreBack);
     doneBtn.addEventListener("click", exploreLeave);

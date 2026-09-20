@@ -55,6 +55,15 @@ real — but nobody polices it, a rating cannot be proved to a third party, and
 clearing your site data starts you at 1200 again. Games against the engine, by
 message, or across one table are kept but never rated.
 
+## Resigning, and offering a draw
+
+Both are ordinary parts of a game and neither needs a referee. **Resign** is
+yours to give: it ends the game there and then, and the other side is told how
+it ended rather than being left to read a win on the board. **Offer a draw**
+waits — a draw is only a draw once your opponent has said yes, and an offer
+lapses the moment a move is played. Both are rated exactly as a game decided on
+the board is.
+
 ## Your record
 
 Every finished game is written down here: the moves, who it was against, how it

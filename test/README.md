@@ -7,6 +7,7 @@ node test/engine.test.js        # the rules, and that the solver proves what it 
 ```sh
 node test/pages.mjs              # every page opens, with the chrome and no errors
 node test/matchmaking.mjs        # the lobby: offered, taken, played, rated, filed
+node test/acts.mjs               # resigning, and a draw offered, declined, agreed
 ```
 
 Those two want the local message service below as well as the web server, since

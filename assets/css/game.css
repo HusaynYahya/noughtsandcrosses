@@ -210,6 +210,14 @@
 .engine-line__moves .waiting { color: var(--text-dim); font-family: var(--font); font-size: .78rem; }
 .mv--var { background: rgba(155, 199, 0, .07); box-shadow: inset 2px 0 0 var(--live-hi); }
 
+/* an offer of a draw, waiting on an answer */
+.offer {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  margin: .45rem 0 0; padding: .45rem .55rem; font-size: .78rem;
+  background: var(--go-dim); border: 1px solid var(--go); color: var(--text-strong);
+}
+.offer span { flex: 1 1 8rem; }
+
 /* ---- status ----------------------------------------------------------- */
 .status {
   display: flex; align-items: center; gap: .55rem;
