@@ -8,7 +8,7 @@
 # ONE MACHINE ONLY. The database is a file on the volume and the games in
 # progress are in that machine's memory, so a second machine would be a second
 # server with its own book. Never `fly scale count 2`.
-app = "ultimate-noughts-and-crosses"
+app = "unc-husayn"
 primary_region = "lhr"
 
 [build]

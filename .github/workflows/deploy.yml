@@ -1,0 +1,146 @@
+# ============================================================================
+# Put the server on Fly
+# ----------------------------------------------------------------------------
+# Everything here runs on GitHub's machines, so the only thing you need locally
+# is a Fly account. Once the FLY_API_TOKEN secret is set, this deploys on every
+# push that touches the server — and can be run by hand from the Actions tab.
+#
+# Setting it up, once:
+#
+#   1. Make a Fly account:              https://fly.io/app/sign-up
+#   2. Make a token for this repository: https://fly.io/user/personal_access_tokens
+#      (or, with flyctl: `fly tokens create deploy --name noughtsandcrosses`)
+#   3. Put it in this repository as a secret named FLY_API_TOKEN:
+#      Settings → Secrets and variables → Actions → New repository secret
+#
+# The app and its disk are made here if they do not exist yet, so there is
+# nothing to set up on Fly by hand. The name and region come from fly.toml.
+# ============================================================================
+name: Deploy the server to Fly
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "Fly app name (blank = whatever fly.toml says)"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "assets/js/engine.js"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "fly.toml"
+      - ".github/workflows/deploy.yml"
+
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is there a token?
+        run: |
+          if [ -z "${FLY_API_TOKEN}" ]; then
+            echo "::error::No FLY_API_TOKEN secret. Make one at" \
+                 "https://fly.io/user/personal_access_tokens and add it under" \
+                 "Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Work out what we are deploying
+        id: what
+        run: |
+          set -euo pipefail
+          APP="${{ github.event.inputs.app }}"
+          [ -n "$APP" ] || APP=$(sed -n 's/^app = "\(.*\)"/\1/p' fly.toml | head -1)
+          REGION=$(sed -n 's/^primary_region = "\(.*\)"/\1/p' fly.toml | head -1)
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+          echo "region=$REGION" >> "$GITHUB_OUTPUT"
+          echo "Deploying **$APP** to **$REGION**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Make the app, if this is the first time
+        run: |
+          set -euo pipefail
+          APP="${{ steps.what.outputs.app }}"
+          if flyctl status --app "$APP" >/dev/null 2>&1; then
+            echo "$APP is already there."
+          else
+            echo "Creating $APP…"
+            flyctl apps create "$APP" --org personal
+          fi
+
+      - name: Make the disk the database lives on, if this is the first time
+        run: |
+          set -euo pipefail
+          APP="${{ steps.what.outputs.app }}"
+          if flyctl volumes list --app "$APP" 2>/dev/null | grep -q unc_data; then
+            echo "The volume is already there."
+          else
+            echo "Creating a 1GB volume in ${{ steps.what.outputs.region }}…"
+            flyctl volumes create unc_data --size 1 \
+              --region "${{ steps.what.outputs.region }}" --app "$APP" --yes
+          fi
+
+      - name: Deploy
+        run: |
+          set -euo pipefail
+          APP="${{ steps.what.outputs.app }}"
+          # the app name can be overridden by hand without editing fly.toml
+          flyctl deploy --remote-only --app "$APP" \
+            --wait-timeout 300 --ha=false
+
+      - name: Make sure it answers
+        run: |
+          set -euo pipefail
+          APP="${{ steps.what.outputs.app }}"
+          URL="https://$APP.fly.dev"
+          for i in $(seq 1 12); do
+            OUT=$(curl -fsS --max-time 10 "$URL/api/health" || true)
+            case "$OUT" in
+              *'"ok":true'*)
+                echo "It is up: $OUT"
+                {
+                  echo ""
+                  echo "The server is live at <$URL>"
+                  echo ""
+                  echo '```json'
+                  echo "$OUT"
+                  echo '```'
+                  echo ""
+                  echo "Point the site at it: put this in \`assets/js/config.js\`"
+                  echo ""
+                  echo '```js'
+                  echo "window.UNC_SERVER = \"$URL\";"
+                  echo '```'
+                } >> "$GITHUB_STEP_SUMMARY"
+                exit 0 ;;
+            esac
+            echo "not yet (try $i)…"
+            sleep 10
+          done
+          echo "::error::The server did not answer on $URL/api/health."
+          flyctl logs --app "$APP" --no-tail | tail -50 || true
+          exit 1
+
+      - name: Keep it to one machine
+        run: |
+          set -euo pipefail
+          APP="${{ steps.what.outputs.app }}"
+          N=$(flyctl machines list --app "$APP" --json | grep -c '"id"' || echo 0)
+          echo "Machines: $N"
+          if [ "$N" -gt 1 ]; then
+            echo "::warning::More than one machine. The database is a file on one" \
+                 "volume and games in progress are in one machine's memory, so a" \
+                 "second machine is a second server. Run: flyctl scale count 1"
+          fi
