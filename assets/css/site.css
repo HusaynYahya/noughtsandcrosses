@@ -333,6 +333,17 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .chart__bar:hover { fill: var(--go-hi); }
 .chart__bar--none { fill: var(--line); }
 
+
+/* ---- tabs -------------------------------------------------------------- */
+.tabs { display: flex; gap: .3rem; margin: 0 0 .8rem; border-bottom: 1px solid var(--line); }
+.tab {
+  font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--text-dim); padding: .45rem .7rem;
+}
+.tab:hover { color: var(--text-strong); }
+.tab--on { color: var(--text-strong); border-bottom-color: var(--go); }
+
 /* ---- the foot ---------------------------------------------------------- */
 .foot {
   border-top: 1px solid var(--line); color: var(--text-dim); font-size: .78rem;

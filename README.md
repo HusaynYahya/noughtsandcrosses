@@ -8,11 +8,12 @@ Play a stranger from the lobby, a friend in a private room, the engine that
 taught itself, or somebody sitting next to you. Games are rated, kept, and can
 be gone over move by move afterwards.
 
-**There is no server.** Every page here is a static file; the whole site works
-by two browsers reaching out to a public message service and talking through
-it. That buys real live play and real matchmaking with nothing to run and
-nothing to pay for — and it sets one honest limit, which the
-[leaderboard](#the-leaderboard-and-what-a-rating-means-here) section spells out.
+**It works two ways.** On its own, every page here is a static file and the
+whole site runs by two browsers reaching out to a public message service and
+talking through it: real live play and real matchmaking, with nothing to run
+and nothing to pay for. Put the [server](#the-server) behind it and it grows
+the three things that arrangement cannot have — accounts, a referee, and a
+memory that outlives a browser.
 
 ## The pages
 
@@ -39,21 +40,57 @@ yours goes near it: **private rooms never appear in the lobby**, they have their
 own hashed topic and their own key, and you are only in the lobby while a page
 of yours is open on it.
 
-## The leaderboard, and what a rating means here
+## The server
+
+`server/` is a complete one: accounts, matchmaking, refereed games, a ladder
+and every game kept on file. It has no dependencies at all — Node's own
+`http`, `crypto` and `sqlite`, and a WebSocket written out in ninety lines —
+so it starts with `node server/index.js` and there is nothing to install.
+
+```sh
+node server/index.js          # the site and the server, on http://localhost:8090
+```
+
+Point the site at it with one line in `assets/js/config.js`:
+
+```js
+window.UNC_SERVER = "https://unc.example.com";
+```
+
+and the site grows a sign-in, a lobby of people with accounts, and games the
+server referees. `server/README.md` has the API, the deployment (Fly, Docker,
+or a plain machine with systemd), and how to look after the database — which is
+one file.
+
+**What the server changes.** It holds the position, decides whether a move is
+legal, runs the clocks and is the only thing that writes a result, so a rating
+is not one player's word against another's. It loads `assets/js/engine.js` —
+the same file the board loads — so the rules it enforces cannot drift from the
+rules you are offered. Games are kept there rather than in your browser, so
+they follow you between devices, and a finished game has an address anybody can
+open.
+
+Without it, everything still works; it is the ladder that changes, as below.
+
+## The leaderboard, and what a rating means
 
 Ratings are ordinary chess Elo. Everybody starts at 1200; after a rated game
 your rating moves by `K × (what you scored − what you were expected to score)`,
 with K at 40 while a rating is new, 24 once it has settled and 16 above 2100.
-Both browsers run the same arithmetic on the same two numbers, so the two sides
-agree without anybody being asked, and the points one player gains are exactly
-the points the other loses.
+The points one player gains are exactly the points the other loses.
 
-What no server means, said plainly: **the table is your own circle, not a world
-ladder.** Each browser keeps its own book. Two people who play each other write
-the same result into both books, so what you see of somebody you have played is
-real — but nobody polices it, a rating cannot be proved to a third party, and
-clearing your site data starts you at 1200 again. Games against the engine, by
-message, or across one table are kept but never rated.
+**With a server**, that sum is done once, by the referee, over a game it
+watched from the first move — so the ladder is a ladder, and `#1` means
+something to everybody looking at it.
+
+**Without one**, each browser does the same arithmetic on the same two numbers
+and reaches the same answer, which is enough for two people who play each other
+to keep an honest record — but it is your own circle, not a world ladder.
+Nobody polices it, a rating cannot be proved to a third party, and clearing
+your site data starts you at 1200 again.
+
+Either way, games against the engine, by message, or across one table are kept
+but never rated, and a game abandoned in the first few moves does not count.
 
 ## Resigning, and offering a draw
 
@@ -227,6 +264,10 @@ network, and that the computer takes a win when one is on offer.
 | `assets/js/archive.js` | Every game you have finished |
 | `assets/js/site.js` | The header and foot, and the small shared helpers |
 | `assets/js/app.js` | The board page: drawing it and wiring the controls |
+| `assets/js/account.js` | Talking to the server: requests, and the one live socket |
+| `assets/js/config.js` | Where the server is, if there is one |
+| `server/` | The server: accounts, matchmaking, refereeing, the book |
 | `assets/js/home.js`, `leaderboard.js`, `games.js`, `profile.js` | A page each |
 | `test/engine.test.js` | Rules tests |
 | `test/pages.mjs`, `test/matchmaking.mjs` | Every page opens; a game found in the lobby, played and rated |
+| `test/server.test.mjs`, `test/withserver.mjs` | The server's protocol; and the site against a real one |

@@ -1,0 +1,40 @@
+# Fly.io, because it gives a machine with a disk and an https address without
+# asking for much. `fly launch --no-deploy` then `fly deploy`; the volume below
+# has to exist first:
+#
+#   fly volumes create unc_data --size 1
+#
+app = "ultimate-noughts-and-crosses"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8090"
+  UNC_DB = "/data/unc.db"
+  # The sites allowed to call this server. Leave it out to allow any.
+  # UNC_ORIGINS = "https://husaynyahya.github.io"
+
+[mounts]
+  source = "unc_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8090
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 200
+    hard_limit = 400
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/api/health"

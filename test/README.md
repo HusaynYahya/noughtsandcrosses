@@ -10,6 +10,13 @@ node test/matchmaking.mjs        # the lobby: offered, taken, played, rated, fil
 node test/acts.mjs               # resigning, and a draw offered, declined, agreed
 ```
 
+With a server:
+
+```sh
+node test/server.test.mjs        # the protocol alone: accounts, pairing, a refereed game
+node test/withserver.mjs         # two browsers, two accounts, a game the server referees
+```
+
 Those two want the local message service below as well as the web server, since
 the lobby is carried on it.
 
@@ -49,6 +56,14 @@ node test/recover.mjs            # and a game that survives losing the connectio
 two separate browsers at the same moment and checks they connect, that a move
 and a message cross, and that twenty more moves leave both boards identical.
 It also shows what the service sees — an opaque topic and sealed blobs.
+
+`server.test.mjs` starts the server itself on a scratch database and speaks the
+protocol to it directly — no browser — so a failure there is the server's and
+nothing else's. `withserver.mjs` then does the same ground through the pages:
+two accounts made on the front page, an offer taken from the server's lobby, a
+game refereed to the end, and the ladder, the games list and both profiles
+checked afterwards. It also walks one player out of a game to see the other
+offered the win.
 
 `matchmaking.mjs` is the one that matters for the site around the board: two
 browsers with their own players, one offering a game in the lobby and the other

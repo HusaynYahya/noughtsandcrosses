@@ -76,7 +76,7 @@
   /* ---- the header and the foot ------------------------------------------ */
   function chrome() {
     var here = doc.body.getAttribute("data-page") || "";
-    var me = root.UNC && root.UNC.player ? root.UNC.player.me() : null;
+    var me = root.UNC && root.UNC.player ? root.UNC.player.who() : null;
 
     var head = doc.createElement("header");
     head.className = "top";
@@ -99,6 +99,7 @@
                   esc(initials(me.name)) + "</span>" +
                 '<span class="who__name">' + esc(me.name) + "</span>" +
                 '<span class="who__rating">' + Math.round(me.rating) + "</span>" +
+                (me.server ? "" : '<span class="tag">local</span>') +
               "</a>" : "");
     doc.body.insertBefore(head, doc.body.firstChild);
 

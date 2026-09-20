@@ -6,8 +6,8 @@
 <meta name="description" content="Ultimate noughts and crosses — nine boards inside one. Play on one device, against the computer, or in a private online room with a friend." />
 <meta name="theme-color" content="#161512" />
 <title>Play · Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/site.css?v=28" />
-<link rel="stylesheet" href="assets/css/game.css?v=28" />
+<link rel="stylesheet" href="assets/css/site.css?v=29" />
+<link rel="stylesheet" href="assets/css/game.css?v=29" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body data-page="play">
@@ -262,6 +262,10 @@
         <button class="btn" type="button" data-resign>Resign</button>
         <button class="btn" type="button" data-draw>Offer a draw</button>
       </div>
+      <p class="offer" data-claim-row hidden>
+        <span data-claim-text>Your opponent has gone.</span>
+        <button class="btn btn--slim" type="button" data-claim>Claim the win</button>
+      </p>
       <p class="offer" data-offer-row hidden>
         <span data-offer-text>A draw is offered.</span>
         <button class="btn btn--slim" type="button" data-offer-yes>Accept</button>
@@ -347,17 +351,19 @@
   </aside>
 </main>
 
-<script src="assets/js/player.js?v=28"></script>
-<script src="assets/js/archive.js?v=28"></script>
-<script src="assets/js/site.js?v=28"></script>
-<script src="assets/js/engine.js?v=28"></script>
-<script src="assets/js/features.js?v=28"></script>
-<script src="assets/js/weights.js?v=28"></script>
-<script src="assets/js/ai.js?v=28"></script>
-<script src="assets/js/analysis.js?v=28"></script>
-<script src="assets/js/live.js?v=28"></script>
-<script src="assets/js/net.js?v=28"></script>
-<script src="assets/js/lobby.js?v=28"></script>
-<script src="assets/js/app.js?v=28" defer></script>
+<script src="assets/js/config.js?v=29"></script>
+<script src="assets/js/account.js?v=29"></script>
+<script src="assets/js/player.js?v=29"></script>
+<script src="assets/js/archive.js?v=29"></script>
+<script src="assets/js/site.js?v=29"></script>
+<script src="assets/js/engine.js?v=29"></script>
+<script src="assets/js/features.js?v=29"></script>
+<script src="assets/js/weights.js?v=29"></script>
+<script src="assets/js/ai.js?v=29"></script>
+<script src="assets/js/analysis.js?v=29"></script>
+<script src="assets/js/live.js?v=29"></script>
+<script src="assets/js/net.js?v=29"></script>
+<script src="assets/js/lobby.js?v=29"></script>
+<script src="assets/js/app.js?v=29" defer></script>
 </body>
 </html>

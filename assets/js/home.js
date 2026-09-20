@@ -12,7 +12,7 @@
 (function () {
   "use strict";
 
-  var S = window.UNC.site, P = window.UNC.player, A = window.UNC.archive;
+  var S = window.UNC.site, P = window.UNC.player, ARCH = window.UNC.archive;
   var NET = window.UNC.net;
   var $ = function (sel) { return document.querySelector(sel); };
 
@@ -28,7 +28,68 @@
       lobbyCount = $("[data-lobby-count]"), lobbyDot = $("[data-lobby-dot]"),
       tcSel = $("[data-seek-tc]"), sideSel = $("[data-seek-side]");
 
+  var A = window.UNC.account;
   var lobby = null, offers = [];
+  var sock = null, onServer = false;   /* the server's lobby, when there is one */
+
+  /* ---- your account, if this site has a server --------------------------- */
+  function drawAccount() {
+    var card = $("[data-account]");
+    if (!A.configured()) { card.hidden = true; return; }
+    card.hidden = false;
+    $("[data-account-where]").textContent = A.where().replace(/^https?:\/\//, "");
+    var body = $("[data-account-body]"), me = A.me();
+
+    if (me) {
+      $("[data-account-head]").textContent = "Signed in";
+      body.innerHTML =
+        '<div class="youcard">' + S.face(me, true) +
+          "<div><b class=\"youcard__name\">" + S.esc(me.name) + "</b>" +
+          '<span class="youcard__rating">' + me.rating +
+            (me.provisional ? '<span class="tag">provisional</span>' : "") +
+            (me.place ? " · #" + me.place : "") + "</span></div></div>" +
+        '<div class="row-btn" style="margin-top:.7rem">' +
+          '<a class="btn btn--slim" href="profile.html">Your profile</a>' +
+          '<button class="btn btn--slim" type="button" data-signout>Sign out</button>' +
+        "</div>";
+      $("[data-signout]").addEventListener("click", function () {
+        A.leave().then(function () { location.reload(); });
+      });
+      return;
+    }
+
+    $("[data-account-head]").textContent = "Sign in";
+    body.innerHTML =
+      '<p class="netline" style="margin-top:0">An account puts you on the ladder, ' +
+        "keeps your games, and has the server referee them — neither player can " +
+        "argue with the result. You can still play a friend without one.</p>" +
+      '<label class="lbl" for="acc-name">Name</label>' +
+      '<input id="acc-name" type="text" data-acc-name autocomplete="username" maxlength="20" />' +
+      '<label class="lbl lbl--spaced" for="acc-pass">Password</label>' +
+      '<input id="acc-pass" type="password" data-acc-pass autocomplete="current-password" />' +
+      '<div class="row-btn" style="margin-top:.7rem">' +
+        '<button class="btn btn--go" type="button" data-signin>Sign in</button>' +
+        '<button class="btn" type="button" data-signup>Create an account</button>' +
+      "</div>" +
+      '<p class="netline" data-acc-said></p>';
+
+    function go(isNew) {
+      var said = $("[data-acc-said]");
+      said.className = "netline";
+      said.textContent = isNew ? "Making your account…" : "Signing in…";
+      A.join($("[data-acc-name]").value, $("[data-acc-pass]").value, isNew)
+        .then(function () { location.reload(); },
+              function (err) {
+                said.className = "netline netline--error";
+                said.textContent = err.message;
+              });
+    }
+    $("[data-signin]").addEventListener("click", function () { go(false); });
+    $("[data-signup]").addEventListener("click", function () { go(true); });
+    $("[data-acc-pass]").addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") go(false);
+    });
+  }
 
   /* ---- the decorative board --------------------------------------------- */
   (function hero() {
@@ -53,7 +114,7 @@
 
   /* ---- you -------------------------------------------------------------- */
   function drawYou() {
-    var me = P.me(), sum = A.summary();
+    var me = P.who(), sum = ARCH.summary();
     $("[data-you-body]").innerHTML =
       '<div class="youcard">' +
         S.face(me, true) +
@@ -68,7 +129,8 @@
         tile(sum.wins + "/" + sum.draws + "/" + sum.losses, "w / d / l") +
         tile(sum.rate + "%", "score") +
       "</div>";
-    var rename = $("[data-rename]");
+    var rename = me.server ? null : $("[data-rename]");
+    if (me.server) $("[data-rename]").removeAttribute("title");
     if (rename) rename.addEventListener("click", function () {
       var next = prompt("What should people call you?", P.me().name);
       if (next == null) return;
@@ -84,7 +146,7 @@
 
   /* ---- your last games --------------------------------------------------- */
   function drawRecent() {
-    var games = A.all().slice(0, 6), body = $("[data-recent]");
+    var games = ARCH.all().slice(0, 6), body = $("[data-recent]");
     $("[data-recent-empty]").hidden = games.length > 0;
     body.innerHTML = games.map(function (g) {
       var mark = g.result === "win" ? '<span class="w">won</span>'
@@ -148,12 +210,18 @@
   });
 
   function accept(seek) {
+    if (seek.server) {
+      /* asking for the same thing they asked for is what pairs the two of you */
+      serverSeek(seek.tc, seek.side === "X" ? "O" : seek.side === "O" ? "X" : "either");
+      return;
+    }
     if (lobby) lobby.take(seek);
     P.seen(seek.who);
     go(seek.room, seek.tc, false);
   }
 
   function offer() {
+    if (onServer) { serverSeek(tcSel.value, sideSel.value); return; }
     var code = NET.makeCode();
     go(code, tcSel.value, true, sideSel.value);
   }
@@ -184,11 +252,69 @@
     location.href = "play.html?room=" + encodeURIComponent(tidy);
   });
 
+  /* ---- the server's lobby ------------------------------------------------- */
+  /* The same table, filled from the server instead of from the message
+     service: these are people with accounts, and taking a game means the
+     server pairs you and referees what follows. */
+  function serverLobby() {
+    onServer = true;
+    $("[data-lobby-name]").textContent = "Open games on the server";
+    lobbyStatus.textContent = "Reaching the server…";
+
+    sock = A.socket({
+      up: function () { lobbyStatus.textContent = "In the lobby."; },
+      down: function () {
+        lobbyDot.className = "dot dot--off";
+        lobbyStatus.textContent = "The server went quiet — trying again…";
+      },
+      message: function (msg) {
+        if (msg.t === "lobby") {
+          offers = msg.seeks.map(function (s) {
+            return { id: s.id, who: s.who, at: s.at, tc: s.tc, side: s.side, server: true };
+          });
+          lobbyDot.className = "dot dot--on";
+          lobbyStatus.textContent = "In the lobby — " +
+            S.plural(msg.players, "player") + " here, " +
+            S.plural(msg.games, "game") + " being played.";
+          drawSeeks(offers, msg.players);
+          return;
+        }
+        if (msg.t === "start") { location.href = "play.html?g=" + encodeURIComponent(msg.game.id); return; }
+        if (msg.t === "error") {
+          lobbyStatus.className = "netline netline--error";
+          lobbyStatus.textContent = msg.why;
+        }
+      }
+    });
+  }
+
+  function serverSeek(tc, side) {
+    if (!sock || !sock.live()) { lobbyStatus.textContent = "Not connected to the server yet."; return; }
+    sock.send({ t: "seek", tc: tc || "0", side: side || "either" });
+    lobbyStatus.textContent = "Waiting for an opponent…";
+  }
+
   /* ---- go ----------------------------------------------------------------- */
   S.ready(function () {
+    drawAccount();
     drawYou();
     drawRecent();
     drawTop();
+
+    if (A.configured() && A.token()) {
+      /* check the server still knows us before trusting the name in this
+         browser, then play on it */
+      A.refresh().then(function (me) {
+        drawAccount();
+        if (me) serverLobby();
+        else peerLobby();
+      });
+      return;
+    }
+    peerLobby();
+  });
+
+  function peerLobby() {
     lobby = window.UNC.lobby.join({
       list: drawSeeks,
       status: function (text, kind) {
@@ -199,6 +325,8 @@
         lobbyDot.className = "dot " + (kind === "live" ? "dot--on" : "dot--off");
       }
     });
-    setInterval(function () { if (offers.length) drawSeeks(offers, lobby.people()); }, 15000);
-  });
+    setInterval(function () {
+      if (offers.length && lobby) drawSeeks(offers, lobby.people());
+    }, 15000);
+  }
 })();

@@ -142,6 +142,9 @@
       drawBtn      = $("[data-draw]"),
       offerRow     = $("[data-offer-row]"),
       offerText    = $("[data-offer-text]"),
+      claimRow     = $("[data-claim-row]"),
+      claimText    = $("[data-claim-text]"),
+      claimBtn     = $("[data-claim]"),
       offerYes     = $("[data-offer-yes]"),
       offerNo      = $("[data-offer-no]"),
       netCheckBtn = $("[data-net-check]"),
@@ -337,11 +340,17 @@
     if (!moves.length) return;
     var mine = mode === "local" ? 0 : seatHome();
     var score = !state.winner ? 0.5 : state.winner === mine ? 1 : 0;
-    var rated = mode === "online" && !!them && moves.length >= 6;
+    var rated = mode === "online" && !srv && !!them && moves.length >= 6;
     var rival = mode === "online" && them ? them : null;
     var change = { before: Math.round(P.me().rating), after: Math.round(P.me().rating), change: 0 };
 
     if (mode !== "local") change = P.finished(score, rival, rated);
+    /* on a server the rating is not ours to work out; it arrives with the end
+       of the game and is written down exactly as given */
+    if (srv && srv.rating) {
+      change = srv.rating;
+      rated = true;
+    }
 
     lastResult = ARCH.add({
       mode: mode,
@@ -440,6 +449,18 @@
     drawBtn.textContent = offered === "mine" ? "Draw offered" : "Offer a draw";
     offerRow.hidden = offered !== "theirs" || state.over;
     offerText.textContent = (them ? them.name : "Your friend") + " offers a draw.";
+
+    /* somebody who has walked away from a refereed game can be claimed
+       against — the server decides whether enough time has passed */
+    var away = srv && srv.awaySince && !state.over;
+    claimRow.hidden = !away;
+    if (away) {
+      var waited = Math.round((Date.now() - srv.awaySince) / 1000);
+      claimText.textContent = (them ? them.name : "Your opponent") +
+        " has gone quiet (" + waited + "s).";
+      claimBtn.disabled = waited < 60;
+      claimBtn.textContent = waited < 60 ? "Claim in " + (60 - waited) + "s" : "Claim the win";
+    }
   }
 
   /* ---- the computer ---------------------------------------------------- */
@@ -873,6 +894,7 @@
     }
     renderClocks();
     renderAnalysis();
+    if (srv && srv.awaySince) renderActs();     /* the claim counts itself down */
   }
 
   function clockText(ms) {
@@ -1554,6 +1576,102 @@
     reset(false);
   }
 
+  /* ---- a game refereed by a server -------------------------------------- */
+  /* The board does not care who is keeping the game honest, only that
+     somebody is. A server game is dressed as an online one whose opponent
+     happens to be the referee: moves go out the same way, the position comes
+     back the same way, and everything else on this page — the clock, the
+     chat, the review afterwards — carries on as it was.
+
+     The one difference that matters: the rating is not ours to work out. The
+     server says what it is, and we write down what it says. */
+  var srv = null;
+
+  function serverGame(view, sock) {
+    srv = { id: view.id, sock: sock, you: view.you, rating: null };
+    mode = "online";
+    modeSel.value = "online";
+    document.querySelectorAll("[data-only]").forEach(function (el) {
+      el.hidden = el.getAttribute("data-only") !== "online";
+    });
+    setupBox.hidden = true;
+    liveBox.hidden = false;
+    chatEl.hidden = false;
+    codeEl.textContent = "a server game";
+    $("[data-copy]").hidden = true;
+
+    net = {
+      role: "guest",
+      code: view.id,
+      connected: function () { return sock.live(); },
+      send: function (msg) {
+        if (!srv) return false;
+        if (msg.t === "move")   return sock.send({ t: "move", game: srv.id, move: msg.move });
+        if (msg.t === "chat")   return sock.send({ t: "chat", game: srv.id, text: msg.text });
+        if (msg.t === "resign") return sock.send({ t: "resign", game: srv.id });
+        if (msg.t === "draw")   return sock.send({ t: "draw", game: srv.id,
+                                                   offer: !!msg.offer, agree: !!msg.agree });
+        return false;                      /* hellos and syncs are the server's job */
+      },
+      close: function () { srv = null; }
+    };
+    roomCode = "";                          /* the server keeps this game, not us */
+    netStatus("Playing on the server.", "live");
+    fromServer(view);
+  }
+
+  /* the server's word, in the shape the board already understands */
+  function fromServer(view) {
+    if (!srv || view.id !== srv.id) return;
+    srv.you = view.you;
+    srv.away = view.away && view.away[view.you === X ? O : X] ? Date.now() : 0;
+    if (!srv.awaySince && srv.away) srv.awaySince = Date.now();
+    if (!srv.away) srv.awaySince = 0;
+    var them = view.you === X ? view.o : view.x;
+    meetThem({ id: "s" + them.id, name: them.name, rating: them.rating, games: 0 });
+
+    var s = E.create();
+    (view.moves || []).forEach(function (m) { if (E.isLegal(s, m)) E.apply(s, m); });
+    if (view.over && !s.over) {
+      s.over = true;
+      s.winner = view.winner | 0;
+      s.winLine = null;
+    }
+    offered = view.draw === 0 ? "" : view.draw === view.you ? "mine" : "theirs";
+
+    applySync({
+      gid: view.id,
+      ply: (view.moves || []).length,
+      how: view.ending || "",
+      state: E.pack(s),
+      moves: view.moves || [],
+      seat: view.you,
+      counted: false,
+      clock: view.clock ? {
+        on: !!view.clock.on, mode: view.clock.mode,
+        base: 0, inc: 0, perMove: 0,
+        x: view.clock.x, o: view.clock.o, running: view.clock.running
+      } : null
+    });
+    if (view.over) netStatus("The game is over.", "");
+  }
+
+  /* what the server says the game did to your rating */
+  function serverEnd(msg) {
+    if (!srv || !msg.game || msg.game.id !== srv.id) return;
+    srv.rating = msg.rated ? msg.rating : null;
+    fromServer(msg.game);
+    if (msg.rated && lastResult) {
+      lastResult.rated = true;
+      lastResult.before = msg.rating.before;
+      lastResult.after = msg.rating.after;
+      lastResult.change = msg.rating.change;
+      say("note", "Rating " + msg.rating.after +
+          " (" + (msg.rating.change > 0 ? "+" : "") + msg.rating.change + ").");
+      render();
+    }
+  }
+
   /* ---- standing in the lobby ------------------------------------------- */
   /* A room made from the front page can be left open: while you sit in it
      alone, the lobby carries the offer so a stranger can walk in. The moment
@@ -1896,6 +2014,9 @@
     drawBtn.addEventListener("click", offerDraw);
     offerYes.addEventListener("click", function () { answerDraw(true); });
     offerNo.addEventListener("click", function () { answerDraw(false); });
+    claimBtn.addEventListener("click", function () {
+      if (srv && serverSock) serverSock.send({ t: "claim", game: srv.id });
+    });
     exploreBtn.addEventListener("click", exploreEnter);
     backBtn.addEventListener("click", exploreBack);
     doneBtn.addEventListener("click", exploreLeave);
@@ -2031,6 +2152,104 @@
     }
   }
 
+  /* ---- joining a game the server is running ------------------------------ */
+  var serverSock = null;
+
+  function joinServerGame(wanted) {
+    var A = window.UNC.account;
+    if (!A || !A.configured()) {
+      netStatus("This site has no server set, so there is no game to join.", "error");
+      render();
+      return;
+    }
+    /* A finished game is a public record: anybody with the address can read
+       it, signed in or not. Only playing needs an account. */
+    if (!A.token()) {
+      if (!wanted) {
+        netStatus("Sign in on the front page to play on the server.", "error");
+        render();
+        return;
+      }
+      netStatus("Fetching the game…", "waiting");
+      render();
+      A.ask("/api/game/" + encodeURIComponent(wanted)).then(function (got) {
+        openServerRecord(got.game);
+      }, function (err) {
+        netStatus(err.message + " Sign in on the front page to play.", "error");
+        render();
+      });
+      return;
+    }
+    netStatus("Reaching the server…", "waiting");
+    var landed = false;
+
+    serverSock = A.socket({
+      up: function () { if (srv) netStatus("Playing on the server.", "live"); },
+      down: function () {
+        if (srv && !state.over) netStatus("Reconnecting to the server…", "waiting");
+        render();
+      },
+      message: function (msg) {
+        if (msg.t === "start") {
+          if (wanted && msg.game.id !== wanted) return;
+          landed = true;
+          serverGame(msg.game, serverSock);
+          return;
+        }
+        if (msg.t === "state") { fromServer(msg.game); return; }
+        if (msg.t === "end")   { serverEnd(msg); return; }
+        if (msg.t === "chat") {
+          if (!srv || msg.side === srv.you) return;      /* our own words, coming back */
+          say("them", msg.text);
+          return;
+        }
+        if (msg.t === "away" && srv && !state.over) {
+          say("note", msg.who + " has gone quiet. If they do not come back you can " +
+                      "claim the game in a minute.");
+          return;
+        }
+        if (msg.t === "error") { netStatus(msg.why, "error"); render(); }
+      }
+    });
+
+    /* No game running under that name: it is finished, and what was asked for
+       is the record of it. Anybody with the address can read that. */
+    setTimeout(function () {
+      if (landed || !wanted) return;
+      A.ask("/api/game/" + encodeURIComponent(wanted)).then(function (got) {
+        openServerRecord(got.game);
+      }, function (err) {
+        netStatus(err.message, "error");
+        render();
+      });
+    }, 2600);
+  }
+
+  /* a finished game from the server's book, put back on the board */
+  function openServerRecord(game) {
+    var read = E.unpackMoves(game.moves);
+    if (!read) { netStatus("That game could not be read.", "error"); return; }
+    setMode("local");
+    reset(false);
+    moves = read.slice();
+    state = E.create();
+    moves.forEach(function (m) { E.apply(state, m); });
+    if (game.winner !== undefined && !state.over) {
+      state.over = true;
+      state.winner = game.winner | 0;
+      state.winLine = null;
+    }
+    endedHow = game.ending || "";
+    counted = true;
+    lastResult = null;
+    render(state.last);
+    reviewEnter();
+    netStatus(game.x.name + " against " + game.o.name + " — " +
+      (game.winner === 0 ? "drawn" : (game.winner === 1 ? game.x.name : game.o.name) + " won") +
+      (game.rated ? ", rated" : "") + ".", "");
+    say("note", "This game was played on the server. Step through it below.");
+  }
+
   /* Any game in your record can be put back on the board and gone over with
      the engine, exactly as if it had just finished here. */
   function openArchived(id) {
@@ -2083,10 +2302,15 @@
   }
 
   var toReview = asked.get("review");
+  var serverId = asked.get("g");
 
   var invited = NET.readLink(location.search, location.hash);
   var byMessage = /[?&]game=([A-Za-z0-9\-_]+)/.exec(location.search);
-  if (toReview) {
+  if (serverId || asked.get("server-game") === "1") {
+    setMode("online");
+    render();
+    joinServerGame(serverId);
+  } else if (toReview) {
     render();
     openArchived(toReview);
   } else if (byMessage) {

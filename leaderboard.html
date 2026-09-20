@@ -6,17 +6,20 @@
 <meta name="description" content="The rating table: you and everybody you have played, strongest first." />
 <meta name="theme-color" content="#161512" />
 <title>Leaderboard · Ultimate Noughts and Crosses</title>
-<link rel="stylesheet" href="assets/css/site.css?v=28" />
+<link rel="stylesheet" href="assets/css/site.css?v=29" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23629924' stroke-width='6' fill='none'%3E%3Cpath d='M36 8v84M64 8v84M8 36h84M8 64h84'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body data-page="board">
 <main class="page" id="main">
   <div class="page__head">
     <h1>Leaderboard</h1>
-    <p>You and everybody you have played, strongest first. There is no server
-       behind this site, so this is your own circle rather than a world ladder:
-       each browser keeps its own book, and two people who play each other write
-       the same result into both. <a href="#how">How the rating works.</a></p>
+    <p data-blurb>You and everybody you have played, strongest first.
+       <a href="#how">How the rating works.</a></p>
+  </div>
+
+  <div class="tabs" data-tabs hidden>
+    <button class="tab" type="button" data-tab="server">The ladder</button>
+    <button class="tab" type="button" data-tab="local">Your circle</button>
   </div>
 
   <div class="tiles" data-tiles></div>
@@ -56,11 +59,13 @@
   </section>
 </main>
 
-<script src="assets/js/player.js?v=28"></script>
-<script src="assets/js/archive.js?v=28"></script>
-<script src="assets/js/site.js?v=28"></script>
-<script src="assets/js/live.js?v=28"></script>
-<script src="assets/js/lobby.js?v=28"></script>
-<script src="assets/js/leaderboard.js?v=28" defer></script>
+<script src="assets/js/config.js?v=29"></script>
+<script src="assets/js/account.js?v=29"></script>
+<script src="assets/js/player.js?v=29"></script>
+<script src="assets/js/archive.js?v=29"></script>
+<script src="assets/js/site.js?v=29"></script>
+<script src="assets/js/live.js?v=29"></script>
+<script src="assets/js/lobby.js?v=29"></script>
+<script src="assets/js/leaderboard.js?v=29" defer></script>
 </body>
 </html>

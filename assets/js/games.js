@@ -7,10 +7,33 @@
    ============================================================================ */
 (function () {
   "use strict";
-  var S = window.UNC.site, A = window.UNC.archive;
+  var S = window.UNC.site, A = window.UNC.archive, ACC = window.UNC.account;
   var rowsEl = document.querySelector("[data-rows]");
   var emptyEl = document.querySelector("[data-empty]");
   var filter = "all";
+  var view = "local", fromServer = null;
+
+  /* A game from the server's book, said the way this browser's own book says
+     things, so one set of rows does for both. */
+  function mine(g) {
+    var me = ACC.me() || {};
+    var meX = g.x.id === me.id;
+    var side = meX ? 1 : 2;
+    return {
+      id: g.id, at: g.at, mode: "online",
+      result: g.winner === 0 ? "draw" : g.winner === side ? "win" : "loss",
+      side: side, ending: g.ending, plies: g.plies, moves: g.moves, rated: g.rated,
+      before: meX ? g.x.before : g.o.before,
+      after: meX ? g.x.after : g.o.after,
+      change: (meX ? g.x.after - g.x.before : g.o.after - g.o.before),
+      opponent: meX ? { id: g.o.id, name: g.o.name } : { id: g.x.id, name: g.x.name },
+      server: true
+    };
+  }
+
+  function games() {
+    return view === "server" && fromServer ? fromServer : A.all();
+  }
 
   function keep(g) {
     if (filter === "all") return true;
@@ -20,7 +43,7 @@
   }
 
   function draw() {
-    var all = A.all(), list = all.filter(keep), sum = A.summary(all);
+    var all = games(), list = all.filter(keep), sum = A.summary(all);
 
     document.querySelector("[data-tiles]").innerHTML =
       tile(sum.played, "games") +
@@ -46,7 +69,9 @@
             : "—") + "</td>" +
         "<td>" + (g.ending === "time" ? "on time" : "on the board") + "</td>" +
         '<td class="quiet" title="' + S.esc(S.when(g.at)) + '">' + S.esc(S.ago(g.at)) + "</td>" +
-        '<td class="num"><a href="play.html?review=' + encodeURIComponent(g.id) +
+        '<td class="num"><a href="' + (g.server
+            ? "play.html?g=" + encodeURIComponent(g.id)
+            : "play.html?review=" + encodeURIComponent(g.id)) +
           '">go over it</a></td></tr>';
     }).join("");
   }
@@ -59,7 +84,7 @@
 
   /* one line a game, the way you would write it in a notebook */
   function asText() {
-    return A.all().map(function (g) {
+    return games().map(function (g) {
       return [new Date(g.at).toISOString().slice(0, 16).replace("T", " "),
               g.result, g.opponent ? g.opponent.name : "—",
               (g.side === 1 ? "X" : "O"), g.plies + " moves",
@@ -68,7 +93,30 @@
     }).join("\n");
   }
 
+  function tabs() {
+    var bar = document.querySelector("[data-tabs]");
+    if (!ACC.configured() || !ACC.me()) return;
+    bar.hidden = false;
+    bar.querySelectorAll("[data-tab]").forEach(function (b) {
+      b.classList.toggle("tab--on", b.getAttribute("data-tab") === view);
+      b.addEventListener("click", function () {
+        view = b.getAttribute("data-tab");
+        tabs();
+        draw();
+      });
+    });
+  }
+
   S.ready(function () {
+    if (ACC.configured() && ACC.me()) {
+      view = "server";
+      tabs();
+      ACC.ask("/api/games?player=" + encodeURIComponent(ACC.me().name) + "&limit=100")
+        .then(function (got) {
+          fromServer = got.games.map(mine);
+          draw();
+        }, function () { view = "local"; tabs(); draw(); });
+    }
     draw();
     document.querySelector("[data-filter]").addEventListener("change", function (ev) {
       filter = ev.target.value;
@@ -78,7 +126,7 @@
       var text = asText();
       var btn = ev.target;
       function done() {
-        btn.textContent = "Copied — " + S.plural(A.all().length, "game");
+        btn.textContent = "Copied — " + S.plural(games().length, "game");
         setTimeout(function () { btn.textContent = "Copy them all as text"; }, 2200);
       }
       if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, done);

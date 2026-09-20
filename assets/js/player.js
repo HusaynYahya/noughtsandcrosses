@@ -64,9 +64,28 @@
 
   function save() { write(ME, whoAmI()); }
 
+  /* Who to show, and who to introduce yourself as. When this browser is
+     signed in to a server, that account is who you are — its name and its
+     rating are the ones other people can check — and this browser's own book
+     goes back to being a private record of games played without one. */
+  function account() {
+    var a = root.UNC && root.UNC.account;
+    var signed = a && a.configured() && a.me();
+    return signed || null;
+  }
+
+  function who() {
+    var them = account();
+    if (!them) return whoAmI();
+    return { id: "s" + them.id, name: them.name, rating: them.rating,
+             games: them.games, wins: them.wins, draws: them.draws,
+             losses: them.losses, best: them.best, since: them.since,
+             server: true };
+  }
+
   /* the short form that travels to the other player */
   function card() {
-    var m = whoAmI();
+    var m = who();
     return { id: m.id, name: m.name, rating: Math.round(m.rating), games: m.games };
   }
 
@@ -189,7 +208,7 @@
 
   root.UNC = root.UNC || {};
   root.UNC.player = {
-    me: whoAmI, card: card, rename: rename, save: save,
+    me: whoAmI, who: who, account: account, card: card, rename: rename, save: save,
     finished: finished, seen: seen, rivals: rivals, table: table,
     expected: expected, after: after, provisional: provisional,
     forget: forget, START: START, PROVISIONAL: PROVISIONAL
