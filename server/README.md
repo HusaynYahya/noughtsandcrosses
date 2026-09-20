@@ -76,22 +76,58 @@ browser will not let an https page talk to a plain-http server or a `ws://`
 socket. Anything that terminates TLS for you — Fly, Render, Caddy, nginx — is
 fine.
 
-**Fly.io**, which is what `fly.toml` here is for:
+**Fly.io**, which is what `fly.toml` here is for. It gives you a machine with
+a disk and an https address, and puts the machine to sleep when nobody is
+playing.
 
 ```sh
-fly launch --no-deploy            # takes the name and region from fly.toml
-fly volumes create unc_data --size 1
+# once, on your own machine
+curl -L https://fly.io/install.sh | sh
+fly auth signup                     # or: fly auth login
+
+cd noughtsandcrosses
+fly launch --no-deploy --copy-config --name unc-<something-of-your-own>
+fly volumes create unc_data --size 1 --region lhr
 fly deploy
+
+fly open /api/health                # {"ok":true,...} means it is up
 ```
+
+`--copy-config` keeps the `fly.toml` in this repository rather than writing a
+new one; the name has to be one nobody else on Fly has taken, and it becomes
+`https://<name>.fly.dev`. Pick the region nearest the people who will play:
+`lhr` London, `iad` Virginia, `fra` Frankfurt, `syd` Sydney.
+
+**Keep it to one machine.** The database is a file on that volume and the games
+in progress are in that machine's memory, so a second machine would be a second
+server with its own book and its own lobby. Never `fly scale count 2`.
 
 **Docker**, anywhere:
 
 ```sh
 docker build -t unc .
-docker run -d --name unc -p 8090:8090 -v unc-data:/data unc
+docker run -d --name unc -p 8090:8090 -v unc-data:/data --restart unless-stopped unc
 ```
 
-**A plain machine**, with systemd and a reverse proxy in front:
+The container starts as root only long enough to hand the volume to an
+unprivileged user, then drops to it. Put something that terminates TLS in front
+of it — see the plain machine below.
+
+**A plain machine** — a £4 VPS is more than enough — with systemd and Caddy,
+which gets a certificate on its own:
+
+```
+# /etc/caddy/Caddyfile
+unc.example.com {
+    reverse_proxy 127.0.0.1:8090
+}
+```
+
+```sh
+git clone https://github.com/HusaynYahya/noughtsandcrosses /srv/noughtsandcrosses
+useradd --system --home /var/lib/unc --create-home unc
+systemctl enable --now unc caddy
+```
 
 ```ini
 # /etc/systemd/system/unc.service

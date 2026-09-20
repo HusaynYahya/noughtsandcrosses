@@ -1,0 +1,10 @@
+# The image wants the site and the server, and nothing else.
+.git
+.github
+node_modules
+train/data
+test
+*.db
+*.db-wal
+*.db-shm
+shot*.png

@@ -1,9 +1,13 @@
 # Fly.io, because it gives a machine with a disk and an https address without
-# asking for much. `fly launch --no-deploy` then `fly deploy`; the volume below
-# has to exist first:
+# asking much of you. In order:
 #
-#   fly volumes create unc_data --size 1
+#   fly launch --no-deploy --copy-config --name <a name nobody has taken>
+#   fly volumes create unc_data --size 1 --region lhr
+#   fly deploy
 #
+# ONE MACHINE ONLY. The database is a file on the volume and the games in
+# progress are in that machine's memory, so a second machine would be a second
+# server with its own book. Never `fly scale count 2`.
 app = "ultimate-noughts-and-crosses"
 primary_region = "lhr"
 
