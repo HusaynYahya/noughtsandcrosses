@@ -1192,6 +1192,7 @@
     if (explore.on) explore.on = false;
     if (review.on) { review.on = false; review.done = false; review.scores = []; }
     analysis.marks = [];
+    if (AI.forget) AI.forget();          /* the old game's tree is no use now */
     state = E.create();
     endedHow = "";
     offered = "";

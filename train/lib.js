@@ -10,12 +10,19 @@ function load(g, file) {
 
 /* weights: an array of numbers, or null for the file the site currently ships */
 function engine(weights) {
+  return engineFrom(path.join(JS_DIR, "ai.js"), weights);
+}
+
+/* The same, but with the search read from wherever you point it — so two
+   versions of the search itself can be put against each other, not only two
+   sets of weights. */
+function engineFrom(aiFile, weights) {
   var g = {};
   load(g, "engine.js");
   load(g, "features.js");
   load(g, "weights.js");
   if (weights) g.UNC.weights = { generation: -1, w: weights.slice() };
-  load(g, "ai.js");
+  new Function("globalThis", "window", fs.readFileSync(aiFile, "utf8"))(g, undefined);
   return g.UNC;
 }
 
@@ -51,5 +58,5 @@ function publish(obj) {
 '})(typeof window !== "undefined" ? window : globalThis);\n');
 }
 
-module.exports = { engine: engine, search: search, readWeights: readWeights,
+module.exports = { engine: engine, engineFrom: engineFrom, search: search, readWeights: readWeights,
                    writeWeights: writeWeights, publish: publish, JS_DIR: JS_DIR };

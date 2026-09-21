@@ -22,6 +22,13 @@
                     is not, and never hands over a move that loses the game on
                     the spot.
 
+   A KEPT TREE      The position you are asked about is usually two moves down
+                    the tree you built last time. Throwing that away and
+                    starting again is the most expensive habit a search can
+                    have, so it is kept — checked square by square against the
+                    position before it is trusted. It is worth about as much as
+                    doubling the time.
+
    `search` does the work and hands back the tree. `think` picks a move from
    it; the analysis board reads the same tree for its opinions.
    ============================================================================ */
@@ -37,7 +44,14 @@
     ruthless: { iterations: 400000, millis: 3000, blunder: 0    }
   };
 
-  var CPUCT = 1.8;          /* how much the search trusts the policy over its own results */
+  var CPUCT = 0.9;          /* how much the search trusts the policy over its own results */
+  /* A playout used to be played to the end. It turns out that after a dozen
+     moves the random game has told you what it is going to tell you, and
+     carrying on only adds noise: stopping there and judging the position beats
+     finishing it, both per playout and per second. Judging without playing at
+     all is much worse — the playout is doing real work, just not for sixty
+     moves. */
+  var ROLL_CAP = 12;        /* moves a playout plays before it is judged instead */
   var FPU = 0.5;            /* what an untried move is assumed to be worth */
   var EXPAND_AT = 1;        /* open a position out once it has been seen this often */
   var SLICE_MS = 12;        /* work done between repaints, when on the page */
@@ -52,8 +66,35 @@
      replaced with probability one-in-count, which draws uniformly from that
      kind without ever building an array. Playouts are where nearly all of the
      time goes, so this is worth the trouble. */
+  /* How much a position is worth to crosses, without playing it out: the
+     boards each side has taken, weighted by how many lines they sit in, plus
+     credit for the lines they are one board short of. Squeezed through a
+     sigmoid so it reads as a probability rather than a pile of points. */
+  var LINE_COUNT = [3, 2, 3, 2, 4, 2, 3, 2, 3];   /* lines through each board */
+
+  function guess(s) {
+    var points = 0, b;
+    for (b = 0; b < 9; b++) {
+      if (s.bw[b] === X) points += LINE_COUNT[b];
+      else if (s.bw[b] === O) points -= LINE_COUNT[b];
+    }
+    /* a line of boards that is one short, with the last one still open */
+    var openBoards = 0;
+    for (b = 0; b < 9; b++) if (!s.bw[b]) openBoards |= 1 << b;
+    points += 1.6 * bits(E.COMPLETES[s.bigX] & openBoards);
+    points -= 1.6 * bits(E.COMPLETES[s.bigO] & openBoards);
+    return 1 / (1 + Math.exp(-0.55 * points));
+  }
+
+  function bits(n) {
+    var c = 0;
+    while (n) { n &= n - 1; c++; }
+    return c;
+  }
+
   function rollout(s, moves) {
-    while (!s.over) {
+    var left = ROLL_CAP;
+    while (!s.over && left-- > 0) {
       E.legalMoves(s, moves);
       var count = moves.length;
       if (!count) break;
@@ -102,11 +143,13 @@
       }
       E.apply(s, chosen);
     }
-    return s.winner;
+    if (s.over) return s.winner === 0 ? 0.5 : (s.winner === X ? 1 : 0);
+    return guess(s);
   }
 
-  function score(winner, player) {
-    return winner === 0 ? 0.5 : (winner === player ? 1 : 0);
+  /* everything below carries one number: how the position looks for crosses */
+  function score(vx, player) {
+    return player === X ? vx : 1 - vx;
   }
 
   /* ---- the tree -------------------------------------------------------- */
@@ -217,16 +260,75 @@
     return top;
   }
 
+  /* ---- keeping the tree between moves ----------------------------------- */
+  /* A search throws away everything it learned the moment it answers, and the
+     next search starts again from nothing — even though the position it is
+     asked about is usually two moves down the tree it just built. Keeping that
+     subtree is free depth: the work is already done and still true.
+
+     What is kept is checked against the position before it is used, square by
+     square, so a tree from another game or another line is never mistaken for
+     this one. */
+  var kept = null;                 /* { root, state } from the last search */
+  var REUSE_FROM = 40;             /* not worth carrying a tree thinner than this */
+
+  function sameState(a, b) {
+    if (a.turn !== b.turn || a.forced !== b.forced || a.filled !== b.filled) return false;
+    for (var i = 0; i < 9; i++) {
+      if (a.mx[i] !== b.mx[i] || a.mo[i] !== b.mo[i] || a.bw[i] !== b.bw[i]) return false;
+    }
+    return true;
+  }
+
+  /* the child, or grandchild, of the kept tree that is this position */
+  function inherit(state) {
+    if (!kept) return null;
+    var gap = state.filled - kept.state.filled;
+    if (gap < 1 || gap > 2) return null;
+
+    var probe = E.create(), i, j, k1, k2;
+    for (i = 0; i < kept.root.kids.length; i++) {
+      k1 = kept.root.kids[i];
+      if (!k1.n) continue;
+      E.copyInto(probe, kept.state);
+      if (!E.isLegal(probe, k1.move)) continue;
+      E.apply(probe, k1.move);
+
+      if (gap === 1) {
+        if (k1.move === state.last && sameState(probe, state)) return k1;
+        continue;
+      }
+      for (j = 0; j < k1.kids.length; j++) {
+        k2 = k1.kids[j];
+        if (k2.move !== state.last || !k2.n) continue;
+        var after = E.copyInto(E.create(), probe);
+        if (!E.isLegal(after, k2.move)) break;
+        E.apply(after, k2.move);
+        if (sameState(after, state)) return k2;
+        break;
+      }
+    }
+    return null;
+  }
+
   /* ---- the search ------------------------------------------------------ */
   /* Calls done(root) when the budget is spent. On the page it works in short
      slices so nothing freezes; in a worker there is nothing to freeze, so it
      runs straight through. */
   function search(state, budget, done) {
     var moves = E.legalMoves(state, []);
-    var root = node(-1, null, 0);
+    var carried = budget.fresh ? null : inherit(state);
+    var root;
+    if (carried && carried.n >= REUSE_FROM) {
+      root = carried;
+      root.parent = null;                /* it is the top of the tree now */
+    } else {
+      root = node(-1, null, 0);
+    }
+    kept = { root: root, state: E.pack(state) };
     var scratch = E.create();
     var buf = [];
-    var iterations = budget.iterations || 200000;
+    var iterations = (budget.iterations || 200000) + (root.n || 0);
     var deadline = Date.now() + (budget.millis || 800);
     var iters = 0, stopped = false;
 
@@ -276,18 +378,18 @@
         if (kid) { n = kid; E.apply(s, n.move); }
       }
 
-      var winner;
+      var vx;
       if (s.over) {                                       /* known, not guessed */
-        winner = s.winner;
-        if (winner === n.mover) settle(n, 1);
-        else if (winner) settle(n, -1);
+        vx = s.winner === 0 ? 0.5 : (s.winner === X ? 1 : 0);
+        if (s.winner === n.mover) settle(n, 1);
+        else if (s.winner) settle(n, -1);
       } else {
-        winner = rollout(s, buf);                         /* play it out */
+        vx = rollout(s, buf);                             /* play it out, or judge it */
       }
 
       while (n && n.parent) {                             /* and remember */
         n.n++;
-        n.w += score(winner, n.mover);
+        n.w += score(vx, n.mover);
         n = n.parent;
       }
       root.n++;
@@ -329,8 +431,12 @@
     return -1;
   }
 
+  /* a new game is a new tree */
+  function forget() { kept = null; }
+
   root.UNC.ai = {
     think: think,
+    forget: forget,
     search: search,
     mostVisited: mostVisited,
     realVisits: real,
