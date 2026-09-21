@@ -21,6 +21,8 @@ function engineFrom(aiFile, weights) {
   load(g, "engine.js");
   load(g, "features.js");
   load(g, "weights.js");
+  if (fs.existsSync(path.join(JS_DIR, "value-weights.js"))) load(g, "value-weights.js");
+  load(g, "value.js");
   if (weights) g.UNC.weights = { generation: -1, w: weights.slice() };
   new Function("globalThis", "window", fs.readFileSync(aiFile, "utf8"))(g, undefined);
   return g.UNC;

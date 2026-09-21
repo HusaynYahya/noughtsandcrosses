@@ -13,7 +13,9 @@ with no server and no dependencies.*
 The engine plays ultimate noughts and crosses by Monte-Carlo tree search. This
 report describes how the part of that search which decides *what to look at
 first* was replaced by a model learned from the engine's own games, and what
-that was worth over the board.
+that was worth over the board. Section 9 is a later pass at the search itself,
+worth +135 rating points, and at the apparatus needed to tell an improvement
+from a hopeful reading of noise.
 
 The model is a **linear softmax policy** over 24 hand-designed features of a
 move, trained by **policy iteration**: the engine plays itself, the number of
@@ -21,12 +23,15 @@ playouts the search gave each move is taken as the teaching signal, and the
 weights are fitted to reproduce that distribution by cross-entropy loss with
 Adam. Each generation must beat its parent over a match before it is adopted.
 
-Two findings are worth stating at the front, because both cut against the
+Three findings are worth stating at the front, because all three cut against the
 obvious expectation. First, **a better search is not the same as a stronger
 engine**: an early version won 67.5% of games at equal playouts and only 52.5%
 at equal time, because the extra thinking cost more than it bought. Second,
 **a lower training loss is not the same as better play**, which is why every
-generation is gated on a match rather than on the loss curve.
+generation is gated on a match rather than on the loss curve. Third, and most
+sharply: a position evaluation fitted to fifteen thousand games predicts the
+winner far better than the hand-written count it replaced, and plays not one
+point stronger. Prediction and play are different jobs.
 
 ---
 
@@ -438,12 +443,9 @@ is chosen by its luck.
 
 ## 8. What would help next
 
-- **A value model to cut the playouts short.** Every playout runs to the end of
-  the game. A cheap estimate of who stands better, applied twenty or thirty
-  moves in, would let the same second buy several times as many samples. This
-  is the single largest gain still on the table.
-- **Reusing the tree between moves.** The search currently throws away
-  everything it learned as soon as a move is played, and rebuilds from nothing.
+- ~~**A value model to cut the playouts short.**~~ Done, in section 9.3 — and
+  the gain came from cutting the playout short rather than from the model.
+- ~~**Reusing the tree between moves.**~~ Done, in section 9.2.
 - **Running the search off the main thread.** In a worker it would not need to
   stop every twelve milliseconds to let the page draw.
 - **Longer gating matches.** See 7.5: the gate needs several hundred games per
@@ -454,11 +456,141 @@ is chosen by its luck.
 - **Feature crosses, or a small network, once a value model exists.** The
   linear policy will have a ceiling. It has not obviously been reached yet.
 
-## 9. Doing it again
+## 9. A second pass, at the search
+
+The section above this one listed what would help next. The first two items on
+it — a cheap estimate to cut the playouts short, and keeping the tree between
+moves — turned out to be worth **+135 rating points together**, measured at
+equal time over 300 paired games. At equal playouts the same build is +160,
+which is the more flattering number and the less useful one: nobody plays at
+equal playouts.
+
+### 9.1 Measuring it properly first
+
+None of what follows would have been trustworthy without fixing the
+measurement. Section 7.5 admits the gating matches were too short to order
+generations. `train/duel.js` is the replacement, and it does three things the
+old evaluator did not:
+
+- **Paired openings.** Every opening is played twice, colours swapped. Which
+  opening you drew is the largest source of variance in a short match, and
+  pairing removes it outright.
+- **A confidence interval, always.** The result is printed as a score, an
+  interval and an Elo range, and the tool says in words when a result is not
+  settled. Most of what was tried was not settled.
+- **Both budgets.** A match can be played at equal playouts or on a clock. The
+  two do not always agree, and when they disagree the clock is right.
+
+Three of the ideas below looked like improvements at a hundred games and turned
+out to be nothing at four hundred.
+
+### 9.2 Keeping the tree between moves — +68
+
+The search threw away its tree after every move and rebuilt from an empty root,
+even though the position it was next asked about was, almost always, two moves
+down the tree it had just built. Carrying that subtree over is free depth: the
+work is done and still true.
+
+The care is in not carrying the wrong one. The candidate subtree is checked
+against the position square by square — every board, both players' marks, whose
+turn, which board is forced — before it is trusted, so a tree from another game
+or another line cannot be mistaken for this one.
+
+Two things went wrong on the way, and both are worth recording.
+
+**It doubled the budget by accident.** The first version added the inherited
+visit count to the iteration limit, so a carried tree did not just start deeper,
+it also did more new work every move — and more each move than the last, since
+the count compounds. At equal playouts it looked like +174. At equal time,
+where the bug cannot hide, the same build was +211 — the flattering measurement
+was the *fixed-playout* one, and the honest number came from the clock. The
+budget is now new work only.
+
+**It ate the machine.** A kept tree grows: each move adds what it searched and
+discards only the branches nobody went down, which are the cheap ones. Left
+alone it reached 3.3 million nodes and 720MB by move thirty, then took the
+process with it. It is now counted and capped at 150,000 nodes; past that the
+search refines the tree it has rather than growing it, and starts fresh next
+move. The cap costs nothing measurable over the board.
+
+### 9.3 Stopping the playout early — +80
+
+A playout used to be played to the end of the game. It now stops after twelve
+moves and the position is judged instead.
+
+This is faster — about twice as many playouts a second — but that is not where
+the gain is. **It also wins at equal playouts**, which means a half-random game
+played out to its end is a *worse* guide to the position than stopping a dozen
+moves in and counting boards. The last forty moves of a random game are noise,
+and averaging noise into the estimate is not free.
+
+The plateau is wide: caps of 6, 8, 12 and 20 are all within noise of each other
+at 600 games. Judging with no playout at all is 119 points worse, so the
+playout is doing real work — it just does not need sixty moves to do it.
+
+### 9.4 Looking where it matters — +39
+
+The constant governing how far the search wanders from what it already believes
+was 1.8, picked by eye when the policy was first added. Played against itself
+at 0.6, 0.7, 0.9, 1.1, 1.2, 1.3, 1.5, 1.8, 2.3 and 3.0, the answer is 0.9, and
+the curve either side of it is a curve rather than a scatter. A learned policy
+you have measured is worth trusting further than one you have not.
+
+### 9.5 What did not work, again
+
+**RAVE.** The classic all-moves-as-first trick: treat a move played later in a
+playout as evidence about that move played now. It is worth a great deal in Go.
+Here, at full strength it was −73; heavily discounted it measured +39 over 80
+games, +4 over 400, and −3 over another 400. That is a null result wearing an
+encouraging hat. The reason is not mysterious: in this game a move's worth is
+mostly *where it sends your opponent*, and that depends on when it is played.
+AMAF cannot see the thing that matters.
+
+**A learned position evaluation.** The judgement at the end of a truncated
+playout is a count of boards, written by hand. Replacing it with a model fitted
+to 15,000 positions from the engine's own games — the same twelve signed counts,
+each also scaled by how far the game has run — cut the held-out loss from 0.80
+to 0.67. It is a much better predictor of who wins.
+
+It plays exactly as well. +2 rating points over 400 games; blending it with the
+playout rather than replacing the count outright is +3 at best and −28 if
+leaned on. The explanation is that the search does not need the evaluation to be
+*calibrated*, only to *order* sibling positions correctly, and after a dozen
+half-random moves both readings order them about equally well. A better number
+attached to a noisier position is still a noisy number.
+
+The model is kept, because it costs nothing, and because a reading fitted to
+fifteen thousand games is a better thing to show a player on the analysis board
+than a count somebody invented in an afternoon. But it bought no strength, and
+saying otherwise would be the kind of claim this report exists to avoid.
+
+**Two more generations of the policy.** Trained against the new, stronger
+search, generations 10 and 11 scored 49.2% and 43.3% against generation 8 and
+were both thrown away. The policy is at a plateau; the search is where the
+remaining ground is.
+
+### 9.6 Where the points came from
+
+Each change removed from the finished engine in turn, 400 paired games at
+120ms a move:
+
+| Taken out | The engine still scores | Worth |
+| --- | --- | --- |
+| Stopping the playout early | 61.4% | +80 |
+| Keeping the tree | 59.6% | +68 |
+| Exploration at 0.9 rather than 1.8 | 55.6% | +39 |
+
+They do not sum to the +135 the whole thing is worth, and should not be expected
+to: rating is not additive, and the three overlap — a kept tree is worth less
+when each playout is noisier, and exploration wants tuning differently when the
+tree persists.
+
+## 10. Doing it again
 
 ```sh
 node train/run.js 3 240 700     # three generations, 240 self-play games each
-node train/evaluate.js train/weights/gen-3.json train/weights/gen-0.json 100 600
+node train/value.js 2500 200    # fit what a position is worth, from its own games
+node train/duel.js shipped /tmp/ai-idea.js 400 120ms    # is the idea any good?
 node test/engine.test.js        # the rules, and that the solver proves what it claims
 ```
 

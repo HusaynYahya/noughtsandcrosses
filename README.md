@@ -72,6 +72,30 @@ open.
 
 Without it, everything still works; it is the ladder that changes, as below.
 
+## The engine
+
+It searches by playing the position out thousands of times a second and keeping
+what it learns, with a learned opinion of which moves are worth looking at
+first. In the last round of work it gained **135 rating points at equal time**,
+from three changes: it keeps its tree between moves rather than starting again,
+it stops each playout after a dozen moves and judges the position instead of
+playing on to the end, and its exploration constant was tuned by playing it
+against itself rather than chosen by eye.
+
+Everything about it is measured rather than argued:
+
+```sh
+node train/duel.js shipped /tmp/ai-idea.js 400 120ms
+```
+
+plays the two searches against each other over paired openings — every opening
+played twice with the colours swapped — and reports a confidence interval with
+the score, saying so plainly when a result is not settled. Several promising
+ideas were not: RAVE, a classic trick worth a lot in Go, measured +4 and −3 over
+400 games each; a position evaluation fitted to 15,000 games predicts the winner
+much better than the count it replaced and plays exactly as well. Both stories
+are in [the write-up](https://husaynyahya.github.io/noughtsandcrosses/paper.html).
+
 ## The leaderboard, and what a rating means
 
 Ratings are ordinary chess Elo. Everybody starts at 1200; after a rated game
@@ -274,6 +298,8 @@ network, and that the computer takes a win when one is on offer.
 | `assets/css/game.css` | The board and the things beside it |
 | `assets/js/engine.js` | The rules. No DOM, no network |
 | `assets/js/ai.js` | The search: Monte-Carlo tree search, in slices |
+| `assets/js/value.js` | What a position is worth, fitted to the engine's own games |
+| `train/duel.js` | Two searches, one match — how any of this is known |
 | `assets/js/analysis.js` | The analysis board: reading the search tree |
 | `assets/js/live.js` | Live play: reaching out to a message service |
 | `assets/js/lobby.js` | The lobby: presence and open offers on one public topic |

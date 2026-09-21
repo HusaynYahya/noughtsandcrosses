@@ -66,31 +66,20 @@
      replaced with probability one-in-count, which draws uniformly from that
      kind without ever building an array. Playouts are where nearly all of the
      time goes, so this is worth the trouble. */
-  /* How much a position is worth to crosses, without playing it out: the
-     boards each side has taken, weighted by how many lines they sit in, plus
-     credit for the lines they are one board short of. Squeezed through a
-     sigmoid so it reads as a probability rather than a pile of points. */
-  var LINE_COUNT = [3, 2, 3, 2, 4, 2, 3, 2, 3];   /* lines through each board */
-
-  function guess(s) {
-    var points = 0, b;
+  /* How much a position is worth to crosses, without playing it out. The
+     reading itself lives in value.js, which is fitted to the engine's own
+     games; without that file, or before it has learned anything, it is the
+     count of boards it replaces. */
+  var V = root.UNC.value;
+  var guess = V ? V.value : function (s) {
+    var points = 0, b, open = 0;
     for (b = 0; b < 9; b++) {
-      if (s.bw[b] === X) points += LINE_COUNT[b];
-      else if (s.bw[b] === O) points -= LINE_COUNT[b];
+      if (s.bw[b] === X) points += 3;
+      else if (s.bw[b] === O) points -= 3;
+      else open |= 1 << b;
     }
-    /* a line of boards that is one short, with the last one still open */
-    var openBoards = 0;
-    for (b = 0; b < 9; b++) if (!s.bw[b]) openBoards |= 1 << b;
-    points += 1.6 * bits(E.COMPLETES[s.bigX] & openBoards);
-    points -= 1.6 * bits(E.COMPLETES[s.bigO] & openBoards);
     return 1 / (1 + Math.exp(-0.55 * points));
-  }
-
-  function bits(n) {
-    var c = 0;
-    while (n) { n &= n - 1; c++; }
-    return c;
-  }
+  };
 
   function rollout(s, moves) {
     var left = ROLL_CAP;
@@ -156,7 +145,10 @@
   /* proven:  1 this node's mover wins with best play
              -1 this node's mover loses
               0 not known                                                    */
+  var made = 0;             /* nodes in the tree being kept, so it cannot run away */
+
   function node(move, parent, mover) {
+    made++;
     return { move: move, parent: parent, mover: mover,
              kids: [], opened: false, p: 0, w: 0, n: 0, proven: 0 };
   }
@@ -271,6 +263,13 @@
      this one. */
   var kept = null;                 /* { root, state } from the last search */
   var REUSE_FROM = 40;             /* not worth carrying a tree thinner than this */
+  /* A kept tree grows: each move adds what it searched and throws away only
+     the branches nobody went down. Left alone it reaches millions of nodes and
+     takes the tab with it, so it is counted, and once it is this big the
+     search stops adding to it and starts again next move. A hundred and fifty thousand
+     nodes is tens of megabytes — deep enough that the cap is rarely reached
+     before a game is over, small enough to be no trouble on a phone. */
+  var NODE_CAP = 150000;
 
   function sameState(a, b) {
     if (a.turn !== b.turn || a.forced !== b.forced || a.filled !== b.filled) return false;
@@ -278,6 +277,18 @@
       if (a.mx[i] !== b.mx[i] || a.mo[i] !== b.mo[i] || a.bw[i] !== b.bw[i]) return false;
     }
     return true;
+  }
+
+  /* how many nodes are under this one, giving up once that is too many */
+  function sizeOf(n, limit) {
+    var stack = [n], seen = 0;
+    while (stack.length) {
+      var top = stack.pop();
+      seen++;
+      if (seen > limit) return seen;
+      for (var i = 0; i < top.kids.length; i++) stack.push(top.kids[i]);
+    }
+    return seen;
   }
 
   /* the child, or grandchild, of the kept tree that is this position */
@@ -318,17 +329,24 @@
   function search(state, budget, done) {
     var moves = E.legalMoves(state, []);
     var carried = budget.fresh ? null : inherit(state);
-    var root;
+    var root, carrying = 0;
     if (carried && carried.n >= REUSE_FROM) {
+      carrying = sizeOf(carried, NODE_CAP);
+    }
+    if (carrying && carrying <= NODE_CAP) {
       root = carried;
       root.parent = null;                /* it is the top of the tree now */
+      made = carrying;                   /* the rest of the old tree is let go */
     } else {
+      made = 0;
       root = node(-1, null, 0);
     }
     kept = { root: root, state: E.pack(state) };
     var scratch = E.create();
     var buf = [];
-    var iterations = (budget.iterations || 200000) + (root.n || 0);
+    /* the budget is new work, and a carried tree is not new work: what it
+       brings is depth already paid for, not licence to do more */
+    var iterations = budget.iterations || 200000;
     var deadline = Date.now() + (budget.millis || 800);
     var iters = 0, stopped = false;
 
@@ -372,7 +390,7 @@
 
       /* A position is opened out the second time it is reached, so a single
          stray visit does not cost a policy call. */
-      if (!s.over && !n.opened && n.n >= EXPAND_AT && !n.proven) {
+      if (!s.over && !n.opened && n.n >= EXPAND_AT && !n.proven && made < NODE_CAP) {
         open(n, s);
         var kid = best(n);
         if (kid) { n = kid; E.apply(s, n.move); }
@@ -432,7 +450,7 @@
   }
 
   /* a new game is a new tree */
-  function forget() { kept = null; }
+  function forget() { kept = null; made = 0; }
 
   root.UNC.ai = {
     think: think,

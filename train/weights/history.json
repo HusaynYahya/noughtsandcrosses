@@ -85,5 +85,25 @@
     "heldOutLossAfter": 1.4505,
     "agreementBefore": 54.8,
     "agreementAfter": 54.7
+  },
+  {
+    "generation": 10,
+    "parent": "gen-8",
+    "score": 49.17,
+    "kept": false,
+    "heldOutLossBefore": 1.4885,
+    "heldOutLossAfter": 1.4833,
+    "agreementBefore": 56,
+    "agreementAfter": 55.8
+  },
+  {
+    "generation": 11,
+    "parent": "gen-8",
+    "score": 43.33,
+    "kept": false,
+    "heldOutLossBefore": 1.51,
+    "heldOutLossAfter": 1.5046,
+    "agreementBefore": 53.7,
+    "agreementAfter": 54.6
   }
 ]

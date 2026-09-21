@@ -27,6 +27,32 @@ against its parent, and `train/weights/history.json` records the run.
 The games themselves land in `train/data/` and are not committed — they are
 several megabytes a generation and can be made again at any time.
 
+## Trying a change to the search
+
+Weights are only half of it. To find out whether a change to the *search* is an
+improvement:
+
+```sh
+node train/duel.js shipped /tmp/ai-idea.js 400 120ms
+```
+
+Every opening is played twice with the colours swapped, which removes the
+biggest source of variance in a short match, and the result comes with a
+confidence interval and a plain statement when it is not settled. Use `120ms`
+(time a move) rather than a playout count when the question is whether it will
+be stronger for somebody actually playing it — the two budgets do not always
+agree, and the clock is the one that matters.
+
+## Fitting what a position is worth
+
+```sh
+node train/value.js 2500 200
+```
+
+Plays games, keeps six positions from each with how the game ended, and fits
+the twelve signed counts in `assets/js/value.js` to them. Writes
+`assets/js/value-weights.js`.
+
 See [PAPER.md](../PAPER.md) for what the model is and how it works — or
 [read it as a page](https://husaynyahya.github.io/noughtsandcrosses/paper.html).
 After editing the markdown, rebuild that page with `node tools/build-paper.js`.
